@@ -4,33 +4,58 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include "msgs.h"
+#include <syslog.h>
+#include "bwd.h"
 
-int debug = 0;
+int log_debug = 0;
 
 /***************************************************
 *             HLESENI CHYB                         *
 ****************************************************/
+
+void msg_init(int debug) {
+
+	log_debug = debug;
+
+	openlog(LOG_NAME, LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+
+}
 
 
 void msg(int type, char* msg, ...) {
 
 //    if (type != MSG_DEBUG || debug) {
 	va_list arg;
-    
+	int level;
+	char buf[MAX_STRING];
+
+	if (!log_debug && type == LOG_DEBUG) {
+		return;	
+	}
+
+	switch (type) {
+		case MSG_ERROR: 	level = LOG_ERR; break;
+		case MSG_WARNING: 	level = LOG_WARNING; break;
+		case MSG_DEBUG:		level = LOG_DEBUG; break; 
+		default:			level = LOG_INFO; break;
+	}
+
 	va_start(arg, msg);
-	vprintf( msg, arg);
-	printf("\n");
+	vsnprintf(buf, MAX_STRING - 1, msg, arg);
 	va_end(arg);
-//    }
+
+	if (log_debug) {
+		printf("%s\n", buf);
+	}
+	syslog(level, "%s", buf);
     
 }
 
 /*
-* napoveda k prikazu
+* help
 */
 void help() {
-    msg(MSG_INFO, "Welcome traffic analyses %s", FLOW_VERSION);
+    msg(MSG_INFO, "Welcome traffic analyses %s", LOG_VERSION);
     msg(MSG_INFO, "Comment please send to <tpoder@cis.vutbr.cz>");
     msg(MSG_INFO, "");
     msg(MSG_INFO, "Usage: trafscan [-i <interface>] [-p] [ -w windows size ] [ -s step size ] [ -r drop ignore ]  ");

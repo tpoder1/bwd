@@ -1,10 +1,12 @@
 
-distdir = trafscan
+distdir = bwd
 
 main:
-	gcc -O3 msgs.c main.c hash_table.c xxhash.c trie.c -lpcap -pthread -Wall -finline-functions \
+	lex config.l
+	bison -d config.y
+	gcc -O3 msgs.c main.c hash_table.c xxhash.c trie.c lex.yy.c config.tab.c config.c -lpcap -pthread -Wall -finline-functions \
 	    -L/usr/local/lib/ \
-	    -o trafscan
+	    -o bwd
 
 clean:
 	rm netflow

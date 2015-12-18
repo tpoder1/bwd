@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include "conf.h"
 #include "sysdep.h"
-#include "msgs.h"
-#include "hash_table.h"
 #include <time.h>
 //#include "dataflow.h"
 
@@ -11,7 +9,8 @@
 //#include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
-#include "trie.h"
+#include "bwd.h"
+#include "msgs.h"
 //#include <netinet/tcp.h>
 
 pcap_t *dev;		// pouzivane rozhrani 
@@ -51,7 +50,7 @@ void terminates(int sig) {
     
     if (dev != NULL && pcap_file(dev) == NULL) 
 	if (pcap_stats(dev, &stat) >= 0 && stat.ps_drop > 0) 
-            msg(MSG_WARMING,"%lu packet dropped by kernel from %lu (%d%%).", 
+            msg(MSG_WARNING,"%lu packet dropped by kernel from %lu (%d%%).", 
 		    stat.ps_drop, stat.ps_recv, stat.ps_drop*100/stat.ps_recv);		
     exit(0); /* libpcap uses onexit to clean up */
 }
@@ -61,7 +60,7 @@ void sig_usr1(int sig)
     struct pcap_stat stat;
     if (dev != NULL && pcap_file(dev) == NULL) 
 	if (pcap_stats(dev, &stat) >= 0 && (stat.ps_drop - last_err) > 0) {
-            msg(MSG_WARMING,"%lu packet dropped by kernel from %lu (%d%%).", 
+            msg(MSG_WARNING,"%lu packet dropped by kernel from %lu (%d%%).", 
 		    stat.ps_drop, stat.ps_recv, stat.ps_drop*100/stat.ps_recv);
 
 	last_pkt = stat.ps_recv - last_pkt;
@@ -220,62 +219,57 @@ int main(int argc, char *argv[]) {
     int oflag = 1;
     int pflag = 0;
     struct bpf_program fcode;    // kvuli expr
-
-//    set_port("2055");		// implicitni nastaveni portu
-//   set_host("127.0.0.1");	// implicitni nastaveni hosta 
-//  set_maxflows("20000");	// implicitni nastaveni poctu max zaznamu 
-//    set_time("300");		// implicitni nastaveni poctu sekund pro export 
+	options_t opt = { .debug = 0, .window = 1 };
 
 
-    //Na zacatku zpracujeme vstupni parametry 
-    while ((op = getopt(argc, argv, "i:w:s:dph:H:P:n:r:")) != -1) {
-	switch (op) {
-	  case 'i' : device = optarg; break;
-	  case 'O' : oflag = 0; break;
-	  case 'p' : pflag = 1; break;
-	  case 'w' : window = atoi(optarg); break;
-	  case 's' : step = atoi(optarg); break;
-	  case 'r' : drop_delay = atoi(optarg); break;
-	  //case 'h' : set_host(optarg); break;
-	  case 'd' : fl_debug = 1; break;
-	//  case 'P' : set_port(optarg); break;
-	//  case 'n' : set_maxflows(optarg); break;
-	//  case 'r' : set_routerid(optarg); break;
-	  case '?' : help();
-	} // konec switch op 
+	strcpy(opt.config_file, "bwd.conf");	
+
+
+    /*  process options */
+	while ((op = getopt(argc, argv, "i:w:s:d:ph:H:P:n:r:")) != -1) {
+		switch (op) {
+			case 'i' : device = optarg; break;
+			case 'O' : oflag = 0; break;
+			case 'p' : pflag = 1; break;
+			case 'd' : opt.debug = atoi(optarg); break;
+			case '?' : help();
+			} // konec switch op 
     } // konec while op...
+
+	msg_init(opt.debug);
+
+	parse_config(&opt);
     
     expression = copy_argv(&argv[optind]);
            
-    if (device == NULL) {			// interface nebyl zadan explicitne
-	device = pcap_lookupdev(ebuf);
-	if (device == NULL) {			// nenalezeno zadne rozhrani 
-    	    msg(MSG_ERROR, ebuf);
-	    exit(1);
-	}					
+	if (device == NULL) {			// interface nebyl zadan explicitne
+		device = pcap_lookupdev(ebuf);
+		if (device == NULL) {			// nenalezeno zadne rozhrani 
+   		    msg(MSG_ERROR, ebuf);
+		    exit(1);
+		}					
     }
 	
     //pokusime se otevrit interface
     if ((dev = pcap_open_live(device, 68, pflag, 1100, ebuf)) == NULL) {
-	msg(MSG_ERROR,ebuf);
-	exit(1);
+		msg(MSG_ERROR,ebuf);
+		exit(1);
     }
 
 
     if (pcap_compile(dev, &fcode,  expression, 1, 0) < 0) {
-        fprintf(stderr,pcap_geterr(dev));
+        msg(MSG_ERROR, pcap_geterr(dev));
     }
 	
     if (pcap_setfilter(dev, &fcode) < 0) {
-	 msg(MSG_ERROR, pcap_geterr(dev));
+		msg(MSG_ERROR, pcap_geterr(dev));
     }
 
-//    msg(MSG_INFO, "Listening on %s.", device);	
     
 //    flow_init();		// otevreni portu, alokace pameti, vycisteni pameti 
 
-	hash_table_init(&hash_table, HASH_TABLE_INIT_SIZE, aggr_callback, NULL, NULL);
-	hash_table_entry_len(&hash_table, sizeof(stat_key_t), sizeof(stat_val_t));
+//	hash_table_init(&hash_table, HASH_TABLE_INIT_SIZE, aggr_callback, NULL, NULL);
+//	hash_table_entry_len(&hash_table, sizeof(stat_key_t), sizeof(stat_val_t));
 
 
 	/* create trie with specidied prefixes */
@@ -297,9 +291,10 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, &terminates);
     signal(SIGUSR1, &sig_usr1);
 	       
+	msg(MSG_INFO, "Listening on %s.", device);	
 
     if (pcap_loop(dev, -1, &process_eth, NULL) < 0) {	// start zachytavani 
-	msg(MSG_ERROR, "eror");
+		msg(MSG_ERROR, "eror");
     }  
 
     pcap_close(dev);
