@@ -276,7 +276,9 @@ int main(int argc, char *argv[]) {
 
 	msg_init(opt.debug);
 
-	parse_config(&opt);
+	if (!parse_config(&opt)) {
+		exit(1);
+	}
 
 	active_opt = &opt;
     

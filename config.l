@@ -45,7 +45,19 @@ ip				return IPTOK;
 ipv4			return IPV4TOK; 
 ipv6			return IPV6TOK; 
 dynamic			return DYNAMICTOK; 
+bps				return BITPSTOK; 
+b\/s			return BITPSTOK; 
+pps				return PPSTOK; 
+p\/s			return PPSTOK; 
 \/				return SLASH;
+[K|k]			{
+					yylval->number = 1000;
+					return FACTOR;
+				}
+[M|m]			{
+					yylval->number = 1000 * 1000;
+					return FACTOR;
+				}
 [0-9]+			{
 					yylval->number = atoi(yytext);
 					return NUMBER;

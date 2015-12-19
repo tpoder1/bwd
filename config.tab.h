@@ -51,9 +51,12 @@
      DYNAMICTOK = 267,
      IPV4TOK = 268,
      IPV6TOK = 269,
-     NUMBER = 270,
-     IPV4ADDR = 271,
-     IPV6ADDR = 272
+     BITPSTOK = 270,
+     PPSTOK = 271,
+     NUMBER = 272,
+     FACTOR = 273,
+     IPV4ADDR = 274,
+     IPV6ADDR = 275
    };
 #endif
 
@@ -76,7 +79,7 @@ typedef union YYSTYPE
 
 
 /* Line 1676 of yacc.c  */
-#line 80 "config.tab.h"
+#line 83 "config.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

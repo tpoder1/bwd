@@ -69,8 +69,8 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 %token OBRACE EBRACE SLASH SEMICOLON
 %token RULETOK LIMITTOK SRCTOK DSTTOK IPTOK 
-%token DYNAMICTOK IPV4TOK IPV6TOK
-%token <number> NUMBER
+%token DYNAMICTOK IPV4TOK IPV6TOK BITPSTOK PPSTOK
+%token <number> NUMBER FACTOR
 %token <ipv4> IPV4ADDR 
 %token <ipv6> IPV6ADDR
 %type <stat_node> rule rules ruleparam ruleparams 
@@ -93,8 +93,12 @@ ruleparams: /* empty */
 	| ruleparams { $<stat_node>$ = $<stat_node>0; } ruleparam SEMICOLON;
 	;
 
+
 ruleparam:
-	| LIMITTOK NUMBER  						{ $<stat_node>0->limit_bps = $2; }
+	| LIMITTOK NUMBER FACTOR BITPSTOK 		{ $<stat_node>0->limit_bps = $2 * $3; }
+	| LIMITTOK NUMBER BITPSTOK 				{ $<stat_node>0->limit_bps = $2; }
+	| LIMITTOK NUMBER FACTOR PPSTOK 		{ $<stat_node>0->limit_pps = $2 * $3; }
+	| LIMITTOK NUMBER PPSTOK 				{ $<stat_node>0->limit_pps = $2; }
 	| DYNAMICTOK IPV4TOK NUMBER 			{ $<stat_node>0->dynamic_ipv4 = $3; }
 	| DYNAMICTOK IPV6TOK NUMBER 			{ $<stat_node>0->dynamic_ipv6 = $3; }
 	| SRCTOK IPTOK IPV4ADDR 				{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, $3, 32, $<stat_node>0) ) { YYABORT; }  ; }
