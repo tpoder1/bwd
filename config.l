@@ -42,6 +42,9 @@ limit			return LIMITTOK;
 src				return SRCTOK; 
 dst				return DSTTOK;
 ip				return IPTOK; 
+ipv4			return IPV4TOK; 
+ipv6			return IPV6TOK; 
+dynamic			return DYNAMICTOK; 
 \/				return SLASH;
 [0-9]+			{
 					yylval->number = atoi(yytext);
@@ -51,7 +54,7 @@ ip				return IPTOK;
 					strncpy(yylval->string, yytext, MAX_STRING - 1);
 					return IPV4ADDR;
 				}
-[0-9\.\:]{9,15}	{
+[0-9a-fA-F\.\:]{9,39}	{
 					strncpy(yylval->string, yytext, MAX_STRING - 1);
 					return IPV6ADDR;
 				}

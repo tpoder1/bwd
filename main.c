@@ -23,26 +23,7 @@ int window = 10;	/* window size for evaluating */
 int step = 1;		/* reporting stem in Mbps */
 int drop_delay = 0;		/* wait with drop n secs */
 
-hash_table_t hash_table;
-
-TTrieNode *pTrieIPV4;
-
-#define DIR_SRC 0x1
-#define DIR_DST 0x2
-
-typedef struct stat_key_s {
-	int direction;
-	uint32_t ip;
-} stat_key_t;
-
-typedef struct stat_val_s {
-	long int bytes;
-	long int pkts;
-	int updated;
-	int windowstart;
-	int laststep;
-	int lastrep;
-} stat_val_t;
+options_t *active_opt;
 
 
 void terminates(int sig) {
@@ -70,65 +51,139 @@ void sig_usr1(int sig)
 //    FlowExport();
 }
 
+void check_expired_nodes(options_t *opt);
+void sig_alrm(int sig) {
 
-/* callback for updating items in hash table */
-void aggr_callback(stat_key_t *pkey, stat_val_t *phval, stat_val_t *puval, void *data) {
-
-	int mbps;
-	char ipstr[INET6_ADDRSTRLEN] = ""; 
-
-	// overflowed windows - zero items 
-	if (phval->windowstart + window <= puval->updated) {
-		mbps = 1.0 * (phval->bytes * 8) / (puval->updated - phval->windowstart) / 1000 / 1000;
-
-		/* did we crossed last reported step */	
-		if (mbps > (phval->laststep + step) ) {
-			phval->laststep = mbps - (mbps % step);	/* last crossed step */
-			inet_ntop(PF_INET, &pkey->ip, ipstr, sizeof(ipstr));
-			printf("%c %-15s E %4d %4d\n", 
-						pkey->direction == DIR_SRC ? 'S' : 'D',
-						ipstr, 
-						phval->laststep, mbps );
-
-			fflush(stdout);
-
-			phval->lastrep = puval->updated;
-
-		} else if (mbps < phval->laststep && phval->lastrep < puval->updated - drop_delay) {
-
-			phval->laststep = mbps - (mbps % step);	/* last crossed step */
-
-			inet_ntop(PF_INET, &pkey->ip, ipstr, sizeof(ipstr));
-			printf("%c %-15s D %4d %4d\n", 
-						pkey->direction == DIR_SRC ? 'S' : 'D',
-						ipstr, 
-						phval->laststep + step, mbps );
-			fflush(stdout);
-
-			phval->lastrep = puval->updated;
-		}
-
-		phval->bytes = puval->bytes;
-		phval->pkts = puval->pkts;
-		phval->windowstart = puval->updated;
-	} else {
-		phval->bytes += puval->bytes;
-		phval->pkts += puval->pkts;
-//		printf("AGGR: %x %d %d \n", pkey->ip, phval->bytes, phval->pkts);
-	}
-
-	phval->updated = puval->updated;
-
+	check_expired_nodes(active_opt);
+	alarm(active_opt->expire_interval);
+	
 }
 
 
+
+void eval_node(options_t *opt, unsigned int bytes, unsigned int pkts, stat_node_t *stat_node) { 
+
+	stat_node->last_updated = time(NULL);
+
+	// reset window 
+	if (stat_node->last_updated >= stat_node->window_reset + stat_node->window_size) {
+		stat_node->window_reset = stat_node->last_updated;
+		stat_node->stats_bytes = 0;
+		stat_node->stats_pkts = 0;			
+	} else {
+		stat_node->stats_bytes += bytes;
+		stat_node->stats_pkts += pkts;
+	}
+
+
+	/* over limit */
+	if (stat_node->stats_bytes / stat_node->window_size * 8 > stat_node->limit_bps * stat_node->treshold) { 
+		if (stat_node->time_reported == 0) {
+			printf("NEW RULE:\n");
+			stat_node_log(opt, stat_node);
+			stat_node->time_reported = stat_node->last_updated;
+			printf("\n");
+		}
+	/* under limit */
+	} else {
+		
+		if (stat_node->time_reported != 0 && stat_node->time_reported + stat_node->remove_delay < stat_node->last_updated) {
+			printf("REMOVE RULE:\n");
+			stat_node_log(opt, stat_node);
+			stat_node->time_reported = 0;
+			printf("\n");
+		}
+	}
+}
+
+/* pass yhrough all rules and update expired */
+void check_expired_nodes(options_t *opt) { 
+
+	stat_node_t *stat_node;
+
+	stat_node = opt->root_node;
+
+	while (stat_node != NULL) {
+
+		eval_node(opt, 0, 0, stat_node); 
+		stat_node = stat_node->next_node;
+
+	}
+}
+
+// zpracovani IP paketu
+void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, int pkts) {
+
+	TTrieNode *pTn, *trie;
+	stat_node_t *stat_node, *new_node;
+	ip_prefix_t *ppref;
+
+	int addrlen;
+
+	/* detect address length */
+	if (af == AF_INET) {
+		addrlen = sizeof(uint32_t);
+		trie = opt->trie4[flow_dir];
+	} else {
+		addrlen = sizeof(uint32_t[4]);
+		trie = opt->trie6[flow_dir];
+	}
+
+	
+	pTn = lookupAddress((void *)addr, addrlen * 8, trie);
+
+	if (pTn != NULL && pTn->hasValue) { 
+//		printf("Matched src record on %x\n", ip_header->ip_src.s_addr);
+		stat_node = pTn->Value;
+		if (stat_node->dynamic_ipv4 != 0) {
+
+			/* add dynamic rule */
+			new_node =  stat_node_new(opt); 
+
+			if (new_node != NULL) {
+				memcpy(new_node, stat_node, sizeof(stat_node_t));
+				new_node->dynamic_ipv4 = 0;
+				new_node->dynamic_ipv6 = 0;
+				new_node->num_prefixes = 1;
+
+				ppref = &new_node->prefixes[0];
+				ppref->af = af;
+				ppref->flow_dir = flow_dir;
+
+				if (af == AF_INET) {
+					memcpy(&ppref->ip.v4, addr, addrlen);
+					ppref->prefixlen = stat_node->dynamic_ipv4;
+					addPrefixToTrie((void *)&(ppref->ip.v4), ppref->prefixlen, new_node, &opt->trie4[flow_dir]);
+				} else {
+					memcpy(&ppref->ip.v6, addr, addrlen);
+					ppref->prefixlen = stat_node->dynamic_ipv6;
+					addPrefixToTrie((void *)&(ppref->ip.v6), ppref->prefixlen, new_node, &opt->trie6[flow_dir]);
+				}
+
+				if (opt->debug > 10) {
+					msg(MSG_INFO, "Added new dynamic rule:\n");
+					stat_node_log(opt, new_node);
+					msg(MSG_INFO, "\n");
+				}
+			}
+
+		} else {
+			eval_node(opt, bytes, pkts, stat_node);
+		}
+		
+	}
+}
+
 // zpracovani IP paketu
 inline void process_ip(const u_char *data, u_int32_t length) {
+
     struct ip *ip_header = (struct ip *) data; 
 
-	stat_key_t key;
-	stat_val_t val;
-	TTrieNode *pTn;
+//	stat_key_t key;
+//	stat_val_t val;
+//	TTrieNode *pTn;
+//	stat_node_t *stat_node, *new_node;
+//	ip_prefix_t *ppref;
 	
     u_int ip_header_len;
     u_int ip_total_len;
@@ -136,34 +191,10 @@ inline void process_ip(const u_char *data, u_int32_t length) {
     ip_total_len = ntohs(ip_header->ip_len);
     ip_header_len = ip_header->ip_hl * 4;	
 
+	eval_packet(active_opt, AF_INET, FLOW_DIR_SRC, (char *)&(ip_header->ip_src.s_addr), ip_total_len, 0);
+	
+	eval_packet(active_opt, AF_INET, FLOW_DIR_DST, (char *)&(ip_header->ip_dst.s_addr), ip_total_len, 0);
 
-	val.bytes = ip_total_len;
-	val.pkts = 1;	
-	val.updated = time(NULL);	
-	val.windowstart = 0;	
-	val.laststep = 0;		
-	val.lastrep = 0;		
-
-	key.ip = ip_header->ip_src.s_addr;
-
-	pTn = lookupAddress((void *)&(key.ip), sizeof(uint32_t) * 8, pTrieIPV4);
-
-	if (pTn != NULL && pTn->hasValue) { 
-		key.direction = DIR_SRC;
-		hash_table_insert_hash(&hash_table, (char *)&key, (char *)&val);
-//		printf("SRC ");
-	}
-
-
-	key.ip = ip_header->ip_dst.s_addr;
-
-	pTn = lookupAddress((void *)&key.ip, sizeof(uint32_t) * 8, pTrieIPV4);
-
-	if (pTn != NULL && pTn->hasValue) { 
-		key.direction = DIR_DST;		
-		hash_table_insert_hash(&hash_table, (char *)&key, (char *)&val);
-//		printf("DST ");
-	}
 
 //	printf("FLOW: %x -> %x %d \n", ip_header->ip_src.s_addr, ip_header->ip_dst.s_addr, ip_total_len);
 
@@ -219,7 +250,14 @@ int main(int argc, char *argv[]) {
     int oflag = 1;
     int pflag = 0;
     struct bpf_program fcode;    // kvuli expr
-	options_t opt = { .debug = 0, .window = 1 };
+
+	options_t opt = { 
+		.debug = 0, 
+		.window_size = 1, 
+		.remove_delay = 60, 
+		.treshold = 0.8,
+//		.expire_interval = 60 };
+		.expire_interval = 60 };
 
 
 	strcpy(opt.config_file, "bwd.conf");	
@@ -239,6 +277,8 @@ int main(int argc, char *argv[]) {
 	msg_init(opt.debug);
 
 	parse_config(&opt);
+
+	active_opt = &opt;
     
     expression = copy_argv(&argv[optind]);
            
@@ -273,6 +313,7 @@ int main(int argc, char *argv[]) {
 
 
 	/* create trie with specidied prefixes */
+/*
 	{
 	pTrieIPV4 = NULL;
 	uint32_t pref; 
@@ -287,11 +328,14 @@ int main(int argc, char *argv[]) {
 
 
 	}	
+*/
            
     signal(SIGINT, &terminates);
     signal(SIGUSR1, &sig_usr1);
+    signal(SIGALRM, &sig_alrm);
 	       
 	msg(MSG_INFO, "Listening on %s.", device);	
+	alarm(opt.expire_interval);
 
     if (pcap_loop(dev, -1, &process_eth, NULL) < 0) {	// start zachytavani 
 		msg(MSG_ERROR, "eror");

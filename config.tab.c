@@ -138,9 +138,12 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
      SRCTOK = 264,
      DSTTOK = 265,
      IPTOK = 266,
-     NUMBER = 267,
-     IPV4ADDR = 268,
-     IPV6ADDR = 269
+     DYNAMICTOK = 267,
+     IPV4TOK = 268,
+     IPV6TOK = 269,
+     NUMBER = 270,
+     IPV4ADDR = 271,
+     IPV6ADDR = 272
    };
 #endif
 
@@ -153,7 +156,7 @@ typedef union YYSTYPE
 /* Line 214 of yacc.c  */
 #line 61 "config.y"
 
-	long int			number;	
+	long int	number;	
 	char 		string[1024];
 	char 		ipv4[1024];
 	char 		ipv6[1024];
@@ -163,7 +166,7 @@ typedef union YYSTYPE
 
 
 /* Line 214 of yacc.c  */
-#line 167 "config.tab.c"
+#line 170 "config.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -175,7 +178,7 @@ typedef union YYSTYPE
 
 
 /* Line 264 of yacc.c  */
-#line 179 "config.tab.c"
+#line 182 "config.tab.c"
 
 #ifdef short
 # undef short
@@ -390,20 +393,20 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  3
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   20
+#define YYLAST   33
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  15
+#define YYNTOKENS  18
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  8
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  16
+#define YYNRULES  22
 /* YYNRULES -- Number of states.  */
-#define YYNSTATES  23
+#define YYNSTATES  36
 
 /* YYTRANSLATE(YYLEX) -- Bison symbol number corresponding to YYLEX.  */
 #define YYUNDEFTOK  2
-#define YYMAXUTOK   269
+#define YYMAXUTOK   272
 
 #define YYTRANSLATE(YYX)						\
   ((unsigned int) (YYX) <= YYMAXUTOK ? yytranslate[YYX] : YYUNDEFTOK)
@@ -437,7 +440,8 @@ static const yytype_uint8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
-       5,     6,     7,     8,     9,    10,    11,    12,    13,    14
+       5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
+      15,    16,    17
 };
 
 #if YYDEBUG
@@ -446,24 +450,29 @@ static const yytype_uint8 yytranslate[] =
 static const yytype_uint8 yyprhs[] =
 {
        0,     0,     3,     4,     6,     7,    10,    11,    17,    18,
-      19,    24,    25,    28,    32,    36,    42
+      19,    24,    25,    28,    32,    36,    40,    44,    50,    56,
+      60,    64,    70
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
 static const yytype_int8 yyrhs[] =
 {
-      16,     0,    -1,    -1,    17,    -1,    -1,    17,    18,    -1,
-      -1,     7,     3,    19,    20,     4,    -1,    -1,    -1,    20,
-      21,    22,     6,    -1,    -1,     8,    12,    -1,     9,    11,
-      13,    -1,     9,    11,    14,    -1,     9,    11,    13,     5,
-      12,    -1,     9,    11,    14,     5,    12,    -1
+      19,     0,    -1,    -1,    20,    -1,    -1,    20,    21,    -1,
+      -1,     7,     3,    22,    23,     4,    -1,    -1,    -1,    23,
+      24,    25,     6,    -1,    -1,     8,    15,    -1,    12,    13,
+      15,    -1,    12,    14,    15,    -1,     9,    11,    16,    -1,
+       9,    11,    17,    -1,     9,    11,    16,     5,    15,    -1,
+       9,    11,    17,     5,    15,    -1,    10,    11,    16,    -1,
+      10,    11,    17,    -1,    10,    11,    16,     5,    15,    -1,
+      10,    11,    17,     5,    15,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    80,    80,    81,    84,    85,    88,    88,    91,    92,
-      92,    95,    96,    97,    98,    99,   100
+       0,    81,    81,    82,    85,    86,    89,    89,    92,    93,
+      93,    96,    97,    98,    99,   100,   101,   102,   103,   104,
+     105,   106,   107
 };
 #endif
 
@@ -473,9 +482,9 @@ static const yytype_uint8 yyrline[] =
 static const char *const yytname[] =
 {
   "$end", "error", "$undefined", "OBRACE", "EBRACE", "SLASH", "SEMICOLON",
-  "RULETOK", "LIMITTOK", "SRCTOK", "DSTTOK", "IPTOK", "NUMBER", "IPV4ADDR",
-  "IPV6ADDR", "$accept", "config", "rules", "rule", "@1", "ruleparams",
-  "@2", "ruleparam", 0
+  "RULETOK", "LIMITTOK", "SRCTOK", "DSTTOK", "IPTOK", "DYNAMICTOK",
+  "IPV4TOK", "IPV6TOK", "NUMBER", "IPV4ADDR", "IPV6ADDR", "$accept",
+  "config", "rules", "rule", "@1", "ruleparams", "@2", "ruleparam", 0
 };
 #endif
 
@@ -485,22 +494,24 @@ static const char *const yytname[] =
 static const yytype_uint16 yytoknum[] =
 {
        0,   256,   257,   258,   259,   260,   261,   262,   263,   264,
-     265,   266,   267,   268,   269
+     265,   266,   267,   268,   269,   270,   271,   272
 };
 # endif
 
 /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,    15,    16,    16,    17,    17,    19,    18,    20,    21,
-      20,    22,    22,    22,    22,    22,    22
+       0,    18,    19,    19,    20,    20,    22,    21,    23,    24,
+      23,    25,    25,    25,    25,    25,    25,    25,    25,    25,
+      25,    25,    25
 };
 
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
 static const yytype_uint8 yyr2[] =
 {
        0,     2,     0,     1,     0,     2,     0,     5,     0,     0,
-       4,     0,     2,     3,     3,     5,     5
+       4,     0,     2,     3,     3,     3,     3,     5,     5,     3,
+       3,     5,     5
 };
 
 /* YYDEFACT[STATE-NAME] -- Default rule to reduce with in state
@@ -509,30 +520,32 @@ static const yytype_uint8 yyr2[] =
 static const yytype_uint8 yydefact[] =
 {
        2,     0,     3,     1,     0,     5,     6,     8,     9,     7,
-      11,     0,     0,     0,    12,     0,    10,    13,    14,     0,
-       0,    15,    16
+      11,     0,     0,     0,     0,     0,    12,     0,     0,     0,
+       0,    10,    15,    16,    19,    20,    13,    14,     0,     0,
+       0,     0,    17,    18,    21,    22
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-      -1,     1,     2,     5,     7,     8,    10,    13
+      -1,     1,     2,     5,     7,     8,    10,    15
 };
 
 /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
    STATE-NUM.  */
-#define YYPACT_NINF -12
+#define YYPACT_NINF -9
 static const yytype_int8 yypact[] =
 {
-      -3,     5,    -1,   -12,     4,   -12,   -12,   -12,     6,   -12,
-      -8,    -4,    -2,     7,   -12,   -11,   -12,     9,    10,     0,
-       8,   -12,   -12
+      -2,     3,     1,    -9,     6,    -9,    -9,    -9,    10,    -9,
+      -8,     0,     5,     7,    -7,    11,    -9,    -6,    -4,     4,
+       8,    -9,    15,    16,    17,    19,    -9,    -9,    12,    13,
+      14,    18,    -9,    -9,    -9,    -9
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -12,   -12,   -12,   -12,   -12,   -12,   -12,   -12
+      -9,    -9,    -9,    -9,    -9,    -9,    -9,    -9
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
@@ -542,25 +555,28 @@ static const yytype_int8 yypgoto[] =
 #define YYTABLE_NINF -5
 static const yytype_int8 yytable[] =
 {
-      11,    12,    17,    18,    -4,     3,     4,     6,    14,    15,
-       9,     0,    21,    16,    19,    20,     0,     0,     0,     0,
-      22
+      11,    12,    13,     3,    14,    -4,    19,    20,     4,     6,
+      22,    23,    24,    25,     9,    16,    17,    21,    18,    26,
+      28,    29,    30,    27,    31,     0,     0,    32,    33,    34,
+       0,     0,     0,    35
 };
 
 static const yytype_int8 yycheck[] =
 {
-       8,     9,    13,    14,     7,     0,     7,     3,    12,    11,
-       4,    -1,    12,     6,     5,     5,    -1,    -1,    -1,    -1,
-      12
+       8,     9,    10,     0,    12,     7,    13,    14,     7,     3,
+      16,    17,    16,    17,     4,    15,    11,     6,    11,    15,
+       5,     5,     5,    15,     5,    -1,    -1,    15,    15,    15,
+      -1,    -1,    -1,    15
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
    symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,    16,    17,     0,     7,    18,     3,    19,    20,     4,
-      21,     8,     9,    22,    12,    11,     6,    13,    14,     5,
-       5,    12,    12
+       0,    19,    20,     0,     7,    21,     3,    22,    23,     4,
+      24,     8,     9,    10,    12,    25,    15,    11,    11,    13,
+      14,     6,    16,    17,    16,    17,    15,    15,     5,     5,
+       5,     5,    15,    15,    15,    15
 };
 
 #define yyerrok		(yyerrstatus = 0)
@@ -1386,63 +1402,105 @@ yyreduce:
         case 6:
 
 /* Line 1455 of yacc.c  */
-#line 88 "config.y"
+#line 89 "config.y"
     { (yyval.stat_node) = stat_node_new(opt); if ((yyval.stat_node) == NULL) { YYABORT; }; ;}
     break;
 
   case 7:
 
 /* Line 1455 of yacc.c  */
-#line 88 "config.y"
+#line 89 "config.y"
     { stat_node_log(opt, (yyvsp[(3) - (5)].stat_node)); ;}
     break;
 
   case 9:
 
 /* Line 1455 of yacc.c  */
-#line 92 "config.y"
+#line 93 "config.y"
     { (yyval.stat_node) = (yyvsp[(0) - (1)].stat_node); ;}
     break;
 
   case 12:
 
 /* Line 1455 of yacc.c  */
-#line 96 "config.y"
-    { (yyvsp[(0) - (2)].stat_node)->limit_bytes = (yyvsp[(2) - (2)].number); ;}
+#line 97 "config.y"
+    { (yyvsp[(0) - (2)].stat_node)->limit_bps = (yyvsp[(2) - (2)].number); ;}
     break;
 
   case 13:
 
 /* Line 1455 of yacc.c  */
-#line 97 "config.y"
-    { if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, (yyvsp[(3) - (3)].ipv4), 32, (yyvsp[(0) - (3)].stat_node)) ) { YYABORT; }  ; ;}
+#line 98 "config.y"
+    { (yyvsp[(0) - (3)].stat_node)->dynamic_ipv4 = (yyvsp[(3) - (3)].number); ;}
     break;
 
   case 14:
 
 /* Line 1455 of yacc.c  */
-#line 98 "config.y"
-    { printf("Y set IPV6 %s\n", (yyvsp[(3) - (3)].ipv6)); ;}
+#line 99 "config.y"
+    { (yyvsp[(0) - (3)].stat_node)->dynamic_ipv6 = (yyvsp[(3) - (3)].number); ;}
     break;
 
   case 15:
 
 /* Line 1455 of yacc.c  */
-#line 99 "config.y"
-    { printf("Y set IPV4 %s / %ld\n", (yyvsp[(3) - (5)].ipv4), (yyvsp[(5) - (5)].number)); ;}
+#line 100 "config.y"
+    { if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, (yyvsp[(3) - (3)].ipv4), 32, (yyvsp[(0) - (3)].stat_node)) ) { YYABORT; }  ; ;}
     break;
 
   case 16:
 
 /* Line 1455 of yacc.c  */
-#line 100 "config.y"
-    { printf("Y set IPV6 %s / %ld\n", (yyvsp[(3) - (5)].ipv6), (yyvsp[(5) - (5)].number)); ;}
+#line 101 "config.y"
+    { if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_SRC, (yyvsp[(3) - (3)].ipv6), 128, (yyvsp[(0) - (3)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 17:
+
+/* Line 1455 of yacc.c  */
+#line 102 "config.y"
+    { if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, (yyvsp[(3) - (5)].ipv4), (yyvsp[(5) - (5)].number), (yyvsp[(0) - (5)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 18:
+
+/* Line 1455 of yacc.c  */
+#line 103 "config.y"
+    { if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_SRC, (yyvsp[(3) - (5)].ipv6), (yyvsp[(5) - (5)].number), (yyvsp[(0) - (5)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 19:
+
+/* Line 1455 of yacc.c  */
+#line 104 "config.y"
+    { if ( !stat_node_add(opt, AF_INET, FLOW_DIR_DST, (yyvsp[(3) - (3)].ipv4), 32, (yyvsp[(0) - (3)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 20:
+
+/* Line 1455 of yacc.c  */
+#line 105 "config.y"
+    { if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_DST, (yyvsp[(3) - (3)].ipv6), 128, (yyvsp[(0) - (3)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 21:
+
+/* Line 1455 of yacc.c  */
+#line 106 "config.y"
+    { if ( !stat_node_add(opt, AF_INET, FLOW_DIR_DST, (yyvsp[(3) - (5)].ipv4), (yyvsp[(5) - (5)].number), (yyvsp[(0) - (5)].stat_node)) ) { YYABORT; }  ; ;}
+    break;
+
+  case 22:
+
+/* Line 1455 of yacc.c  */
+#line 107 "config.y"
+    { if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_DST, (yyvsp[(3) - (5)].ipv6), (yyvsp[(5) - (5)].number), (yyvsp[(0) - (5)].stat_node)) ) { YYABORT; }  ; ;}
     break;
 
 
 
 /* Line 1455 of yacc.c  */
-#line 1446 "config.tab.c"
+#line 1504 "config.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -1654,6 +1712,6 @@ yyreturn:
 
 
 /* Line 1675 of yacc.c  */
-#line 103 "config.y"
+#line 109 "config.y"
  
 

@@ -48,9 +48,12 @@
      SRCTOK = 264,
      DSTTOK = 265,
      IPTOK = 266,
-     NUMBER = 267,
-     IPV4ADDR = 268,
-     IPV6ADDR = 269
+     DYNAMICTOK = 267,
+     IPV4TOK = 268,
+     IPV6TOK = 269,
+     NUMBER = 270,
+     IPV4ADDR = 271,
+     IPV6ADDR = 272
    };
 #endif
 
@@ -63,7 +66,7 @@ typedef union YYSTYPE
 /* Line 1676 of yacc.c  */
 #line 61 "config.y"
 
-	long int			number;	
+	long int	number;	
 	char 		string[1024];
 	char 		ipv4[1024];
 	char 		ipv6[1024];
@@ -73,7 +76,7 @@ typedef union YYSTYPE
 
 
 /* Line 1676 of yacc.c  */
-#line 77 "config.tab.h"
+#line 80 "config.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

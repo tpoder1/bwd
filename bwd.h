@@ -11,23 +11,6 @@
 #define MAX_STRING 1024
 #define MAX_PREF_PER_RULE 16	/* max. number of prefixes per riule */
 
-/* general options of bwd */
-typedef struct options_s {
-
-	int debug;			/* debug mode */
-	int window;			/* window size for evaluating */
-	int step;			/* reporting stem in Mbps */
-	int drop_delay;		/* wait with drop n secs */
-	char config_file[MAX_STRING];		/* config gile name */
-
-//	hash_table_t hash_table;
-#define FLOW_DIR_SRC 	0
-#define FLOW_DIR_DST 	1
-	TTrieNode *trie4[2];
-	TTrieNode *trie6[2];
-
-} options_t;
-
 /* address rule structure */
 typedef struct ip_prefix_s {
 
@@ -43,18 +26,48 @@ typedef struct ip_prefix_s {
 
 /* statistics node */
 typedef struct stat_node_s {
-	long int bytes;
-	long int pkts;
-	long int limit_bytes;
-	long int limit_pkts;
-	int updated;
-	int windowstart;
-	int laststep;
-	int lastrep;
-
-	int num_prefixes; 	/* number of prefixes */
+	int num_prefixes; 				/* number of prefixes */
 	ip_prefix_t prefixes[MAX_PREF_PER_RULE];;
+	int limit_bps;					/* set limits */
+	int limit_pps;
+	double treshold;   				/* treshold (0.78 = 78%) */
+	int window_size; 	 			/* window size to evaluate (in seconds) */
+	int remove_delay;				/* delay before shaping rule is removed */
+	int dynamic_ipv4;				/* prefix size for dynamic rules */
+	int dynamic_ipv6;
+
+	unsigned long int stats_bytes;		/* real byte/packet count */
+	unsigned long int stats_pkts;
+
+	int last_updated;		/* when the statistics were updated */
+	int window_reset;		/* when the current window started */
+	int time_reported;		/* when las report wad done - 0 if not reported */
+
+	struct stat_node_s  *next_node;
+
 } stat_node_t;
+
+
+/* general options of bwd */
+typedef struct options_s {
+
+	int debug;						/* debug mode */
+	double treshold;   				/* treshold (0.78 = 78%) */
+	int window_size; 	 			/* window size to evaluate (in seconds) */
+	int remove_delay;				/* delay before shaping rule is removed */
+	int expire_interval;			/* how ofter check for expired records */
+	int last_expire_check;			/* timestam of last expire check */
+	char config_file[MAX_STRING];	/* config gile name */
+
+//	hash_table_t hash_table;
+#define FLOW_DIR_SRC 	0
+#define FLOW_DIR_DST 	1
+	TTrieNode *trie4[2];
+	TTrieNode *trie6[2];
+	stat_node_t *root_node;
+
+} options_t;
+
 
 
 int parse_config(options_t *opt);

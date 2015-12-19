@@ -72,6 +72,13 @@ stat_node_t * stat_node_new(options_t *opt) {
 
 	memset(tmp, 0x0, sizeof(stat_node_t));
 
+	tmp->window_size = opt->window_size;
+	tmp->remove_delay = opt->remove_delay;
+	tmp->treshold = opt->treshold;
+
+	tmp->next_node = opt->root_node;
+	opt->root_node = tmp;
+
 	return tmp;
 }
 
@@ -119,7 +126,10 @@ void stat_node_log(options_t *opt, stat_node_t *stat_node) {
 	
 
 	if (opt != NULL) {
-		printf("Created node: %ld b/s\n", stat_node->limit_bytes);
+
+		printf("limit %d b/s\n", stat_node->limit_bps);
+		printf("current %ld b/s\n", stat_node->stats_bytes / stat_node->window_size * 8);
+
 		for (i = 0; i < stat_node->num_prefixes; i++) {
 			ppref = &stat_node->prefixes[i];
 			
@@ -133,8 +143,14 @@ void stat_node_log(options_t *opt, stat_node_t *stat_node) {
 				default:
 					buf[0] = '\0';
 				}
-			printf("   prefix %s/%d %x %x \n", buf, ppref->prefixlen, ppref->af, ppref->flow_dir);
+
+			printf("%s ip %s %s/%d \n", 
+							ppref->af == AF_INET ? "inet" : "inet6", 
+							ppref->flow_dir == FLOW_DIR_SRC ? "src" : "dst", 
+							buf, ppref->prefixlen );
+
 		}
+		printf("\n");
 	}
 }
 

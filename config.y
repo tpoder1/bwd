@@ -59,7 +59,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 %}
 
 %union {
-	long int			number;	
+	long int	number;	
 	char 		string[1024];
 	char 		ipv4[1024];
 	char 		ipv6[1024];
@@ -69,6 +69,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 %token OBRACE EBRACE SLASH SEMICOLON
 %token RULETOK LIMITTOK SRCTOK DSTTOK IPTOK 
+%token DYNAMICTOK IPV4TOK IPV6TOK
 %token <number> NUMBER
 %token <ipv4> IPV4ADDR 
 %token <ipv6> IPV6ADDR
@@ -93,11 +94,16 @@ ruleparams: /* empty */
 	;
 
 ruleparam:
-	| LIMITTOK NUMBER  						{ $<stat_node>0->limit_bytes = $2; }
+	| LIMITTOK NUMBER  						{ $<stat_node>0->limit_bps = $2; }
+	| DYNAMICTOK IPV4TOK NUMBER 			{ $<stat_node>0->dynamic_ipv4 = $3; }
+	| DYNAMICTOK IPV6TOK NUMBER 			{ $<stat_node>0->dynamic_ipv6 = $3; }
 	| SRCTOK IPTOK IPV4ADDR 				{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, $3, 32, $<stat_node>0) ) { YYABORT; }  ; }
-	| SRCTOK IPTOK IPV6ADDR 				{ printf("Y set IPV6 %s\n", $3); }
-	| SRCTOK IPTOK IPV4ADDR SLASH NUMBER 	{ printf("Y set IPV4 %s / %ld\n", $3, $5); }
-	| SRCTOK IPTOK IPV6ADDR SLASH NUMBER 	{ printf("Y set IPV6 %s / %ld\n", $3, $5); }
-//	| DSTTOK IPV6ADDR 	{ ;	}
+	| SRCTOK IPTOK IPV6ADDR 				{ if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_SRC, $3, 128, $<stat_node>0) ) { YYABORT; }  ; }
+	| SRCTOK IPTOK IPV4ADDR SLASH NUMBER 	{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, $3, $5, $<stat_node>0) ) { YYABORT; }  ; }
+	| SRCTOK IPTOK IPV6ADDR SLASH NUMBER 	{ if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_SRC, $3, $5, $<stat_node>0) ) { YYABORT; }  ; }
+	| DSTTOK IPTOK IPV4ADDR 				{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_DST, $3, 32, $<stat_node>0) ) { YYABORT; }  ; }
+	| DSTTOK IPTOK IPV6ADDR 				{ if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_DST, $3, 128, $<stat_node>0) ) { YYABORT; }  ; }
+	| DSTTOK IPTOK IPV4ADDR SLASH NUMBER 	{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_DST, $3, $5, $<stat_node>0) ) { YYABORT; }  ; }
+	| DSTTOK IPTOK IPV6ADDR SLASH NUMBER 	{ if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_DST, $3, $5, $<stat_node>0) ) { YYABORT; }  ; }
 	; 
 %% 
