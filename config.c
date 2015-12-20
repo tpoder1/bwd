@@ -118,39 +118,58 @@ int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int 
 
 }
 
-void stat_node_log(options_t *opt, stat_node_t *stat_node) {
+void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_node) {
 
 	int i;
 	ip_prefix_t *ppref;
 	char buf[MAX_STRING];
+	char *actionstr;
 	
 
-	if (opt != NULL) {
+	if (opt == NULL) {
 
-		printf("limit %d b/s\n", stat_node->limit_bps);
-		printf("current %ld b/s\n", stat_node->stats_bytes / stat_node->window_size * 8);
+		return;
 
-		for (i = 0; i < stat_node->num_prefixes; i++) {
-			ppref = &stat_node->prefixes[i];
-			
-			switch (ppref->af) {
-				case AF_INET: 
-					inet_ntop(ppref->af, &ppref->ip.v4, (void *)&buf, MAX_STRING - 1);
-					break;
-				case AF_INET6: 
-					inet_ntop(ppref->af, &ppref->ip.v6, (void *)&buf, MAX_STRING - 1);
-					break;
-				default:
-					buf[0] = '\0';
-				}
-
-			printf("%s ip %s %s/%d \n", 
-							ppref->af == AF_INET ? "inet" : "inet6", 
-							ppref->flow_dir == FLOW_DIR_SRC ? "src" : "dst", 
-							buf, ppref->prefixlen );
-
-		}
-		printf("\n");
 	}
+
+	switch(action) {
+		case ACTION_DUMP: actionstr = "dump"; break;
+		case ACTION_NEW:  actionstr = "new"; break;
+		case ACTION_DEL:  actionstr = "del"; break;
+		default: actionstr = "?"; break;
+	}
+
+	fprintf(fh, "action: %s\n", actionstr);
+
+	for (i = 0; i < stat_node->num_prefixes; i++) {
+		ppref = &stat_node->prefixes[i];
+			
+		switch (ppref->af) {
+			case AF_INET: 
+				inet_ntop(ppref->af, &ppref->ip.v4, (void *)&buf, MAX_STRING - 1);
+				break;
+			case AF_INET6: 
+				inet_ntop(ppref->af, &ppref->ip.v6, (void *)&buf, MAX_STRING - 1);
+				break;
+			default:
+				buf[0] = '\0';
+			}
+
+		fprintf(fh, "%sip: %s/%d \n", 
+						ppref->flow_dir == FLOW_DIR_SRC ? "src" : "dst", 
+						buf, ppref->prefixlen );
+
+	}
+
+	fprintf(fh, "limit_bps: %d\n", stat_node->limit_bps);
+	fprintf(fh, "limit_pps: %d\n", stat_node->limit_pps);
+	fprintf(fh, "current_bps: %ld\n", stat_node->stats_bytes / stat_node->window_size * 8);
+	fprintf(fh, "current_pps: %ld\n", stat_node->stats_pkts / stat_node->window_size);
+	fprintf(fh, "dynamic_ipv4: %d\n", stat_node->dynamic_ipv4);
+	fprintf(fh, "dynamic_ipv6: %d\n", stat_node->dynamic_ipv6);
+	fprintf(fh, "treshold: %f\n", stat_node->treshold);
+//		printf("node: %p\n", stat_node);
+//		printf("next_node: %p\n", stat_node->next_node);
+
 }
 

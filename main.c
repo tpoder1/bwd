@@ -36,8 +36,7 @@ void terminates(int sig) {
     exit(0); /* libpcap uses onexit to clean up */
 }
     
-void sig_usr1(int sig)
-{
+void sig_usr1(int sig) {
     struct pcap_stat stat;
     if (dev != NULL && pcap_file(dev) == NULL) 
 	if (pcap_stats(dev, &stat) >= 0 && (stat.ps_drop - last_err) > 0) {
@@ -51,6 +50,11 @@ void sig_usr1(int sig)
 //    FlowExport();
 }
 
+void dump_nodes_db(options_t *opt);
+void sig_usr2(int sig) {
+	dump_nodes_db(active_opt);
+}
+
 void check_expired_nodes(options_t *opt);
 void sig_alrm(int sig) {
 
@@ -59,6 +63,43 @@ void sig_alrm(int sig) {
 	
 }
 
+int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action) {
+
+	char cmd[MAX_STRING];
+	FILE *fh;
+
+
+	switch (action) {
+		case ACTION_NEW: snprintf(cmd, MAX_STRING, "%s %s", opt->exec_new, "new"); break;
+		case ACTION_DEL: snprintf(cmd, MAX_STRING, "%s %s", opt->exec_new, "del"); break;
+		default: return 0; break;
+	}
+
+
+	fh = popen(cmd, "w");
+
+	if (fh == NULL) {
+		msg(MSG_ERROR, "Can execute external command %s.", cmd);
+		return 0;
+	}
+
+	stat_node_log(fh, action, opt, stat_node);
+	fflush(fh);
+
+	if (opt->debug > 5) {
+		fprintf(stdout, "Trying to execute command %s.\n", cmd);
+		stat_node_log(stdout, action, opt, stat_node);
+		fprintf(stdout, "\n");
+	}
+
+	if ( pclose(fh) != 0 ) {
+		msg(MSG_ERROR, "External command %s was not executed.", cmd);
+		return 0;
+	}
+
+	return 1;
+
+}
 
 
 void eval_node(options_t *opt, unsigned int bytes, unsigned int pkts, stat_node_t *stat_node) { 
@@ -79,19 +120,15 @@ void eval_node(options_t *opt, unsigned int bytes, unsigned int pkts, stat_node_
 	/* over limit */
 	if (stat_node->stats_bytes / stat_node->window_size * 8 > stat_node->limit_bps * stat_node->treshold) { 
 		if (stat_node->time_reported == 0) {
-			printf("NEW RULE:\n");
-			stat_node_log(opt, stat_node);
+			exec_node_cmd(opt, stat_node, ACTION_NEW);
 			stat_node->time_reported = stat_node->last_updated;
-			printf("\n");
 		}
 	/* under limit */
 	} else {
 		
 		if (stat_node->time_reported != 0 && stat_node->time_reported + stat_node->remove_delay < stat_node->last_updated) {
-			printf("REMOVE RULE:\n");
-			stat_node_log(opt, stat_node);
+			exec_node_cmd(opt, stat_node, ACTION_DEL);
 			stat_node->time_reported = 0;
-			printf("\n");
 		}
 	}
 }
@@ -111,11 +148,49 @@ void check_expired_nodes(options_t *opt) {
 	}
 }
 
+/* pass yhrough all rules and update expired */
+void dump_nodes_db(options_t *opt) { 
+
+	stat_node_t *stat_node;
+	int i = 0;
+	int j = 0;
+	FILE *fh;
+
+
+	/* open dbdump file */
+	fh = fopen(opt->dbdump_file, "w"); 
+
+	if (fh == NULL) {
+		msg(MSG_ERROR, "Can not open file %s.", opt->dbdump_file);
+		return;
+	}
+
+	stat_node = opt->root_node;
+
+	while (stat_node != NULL) {
+
+		stat_node_log(fh, ACTION_DUMP, opt, stat_node);
+		fprintf(fh, "\n");
+		i++;
+
+		if (stat_node->time_reported != 0) {
+			j++;
+		}
+
+		stat_node = stat_node->next_node;
+
+	}
+
+	fprintf(fh, "# total rules: %d\n", i);
+	fprintf(fh, "# active rules: %d\n", j);
+	fclose(fh);
+}
+
 // zpracovani IP paketu
 void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, int pkts) {
 
 	TTrieNode *pTn, *trie;
-	stat_node_t *stat_node, *new_node;
+	stat_node_t *stat_node, *new_node, *tmp;
 	ip_prefix_t *ppref;
 
 	int addrlen;
@@ -138,10 +213,15 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 		if (stat_node->dynamic_ipv4 != 0) {
 
 			/* add dynamic rule */
-			new_node =  stat_node_new(opt); 
+			new_node = stat_node_new(opt); 
 
 			if (new_node != NULL) {
+
+				/* copy content of the parent node except next_node pounter (assigned by stat_node_new */
+				tmp = new_node->next_node;
 				memcpy(new_node, stat_node, sizeof(stat_node_t));
+				new_node->next_node = tmp;
+
 				new_node->dynamic_ipv4 = 0;
 				new_node->dynamic_ipv6 = 0;
 				new_node->num_prefixes = 1;
@@ -162,9 +242,11 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 
 				if (opt->debug > 10) {
 					msg(MSG_INFO, "Added new dynamic rule:\n");
-					stat_node_log(opt, new_node);
+					stat_node_log(stdout, ACTION_DUMP, opt, new_node);
 					msg(MSG_INFO, "\n");
 				}
+
+				
 			}
 
 		} else {
@@ -191,9 +273,9 @@ inline void process_ip(const u_char *data, u_int32_t length) {
     ip_total_len = ntohs(ip_header->ip_len);
     ip_header_len = ip_header->ip_hl * 4;	
 
-	eval_packet(active_opt, AF_INET, FLOW_DIR_SRC, (char *)&(ip_header->ip_src.s_addr), ip_total_len, 0);
+	eval_packet(active_opt, AF_INET, FLOW_DIR_SRC, (char *)&(ip_header->ip_src.s_addr), ip_total_len, 1);
 	
-	eval_packet(active_opt, AF_INET, FLOW_DIR_DST, (char *)&(ip_header->ip_dst.s_addr), ip_total_len, 0);
+	eval_packet(active_opt, AF_INET, FLOW_DIR_DST, (char *)&(ip_header->ip_dst.s_addr), ip_total_len, 1);
 
 
 //	printf("FLOW: %x -> %x %d \n", ip_header->ip_src.s_addr, ip_header->ip_dst.s_addr, ip_total_len);
@@ -261,6 +343,9 @@ int main(int argc, char *argv[]) {
 
 
 	strcpy(opt.config_file, "bwd.conf");	
+	strcpy(opt.dbdump_file, "bwd.dbdump");	
+	strcpy(opt.exec_new, "./bwd.sh");	
+	strcpy(opt.exec_del, "./bwd.sh");	
 
 
     /*  process options */
@@ -334,6 +419,7 @@ int main(int argc, char *argv[]) {
            
     signal(SIGINT, &terminates);
     signal(SIGUSR1, &sig_usr1);
+    signal(SIGUSR2, &sig_usr2);
     signal(SIGALRM, &sig_alrm);
 	       
 	msg(MSG_INFO, "Listening on %s.", device);	

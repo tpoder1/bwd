@@ -1420,7 +1420,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 89 "config.y"
-    { stat_node_log(opt, (yyvsp[(3) - (5)].stat_node)); ;}
+    { ;  ;}
     break;
 
   case 9:

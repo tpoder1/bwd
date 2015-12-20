@@ -86,7 +86,7 @@ rules: /* empty */
 	| rules rule;
 
 rule: 
-	RULETOK OBRACE { $<stat_node>$ = stat_node_new(opt); if ($<stat_node>$ == NULL) { YYABORT; }; } ruleparams EBRACE	{ stat_node_log(opt, $<stat_node>3); } 
+	RULETOK OBRACE { $<stat_node>$ = stat_node_new(opt); if ($<stat_node>$ == NULL) { YYABORT; }; } ruleparams EBRACE	{ ;  } 
 	;
 
 ruleparams: /* empty */ 

@@ -58,6 +58,9 @@ typedef struct options_s {
 	int expire_interval;			/* how ofter check for expired records */
 	int last_expire_check;			/* timestam of last expire check */
 	char config_file[MAX_STRING];	/* config gile name */
+	char dbdump_file[MAX_STRING];	/* status file for database dump */
+	char exec_new[MAX_STRING];		/* command to exec new rule */
+	char exec_del[MAX_STRING];		/* command to exec to remove rule */
 
 //	hash_table_t hash_table;
 #define FLOW_DIR_SRC 	0
@@ -68,10 +71,16 @@ typedef struct options_s {
 
 } options_t;
 
+typedef enum action_s {
+	ACTION_DUMP,
+	ACTION_NEW,
+	ACTION_DEL
+} action_t;
+
 
 
 int parse_config(options_t *opt);
 stat_node_t * stat_node_new(options_t *opt);
 int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int prefixlen, stat_node_t *stat_node);
-void stat_node_log(options_t *opt, stat_node_t *stat_node);
+void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_node);
 
