@@ -5,6 +5,7 @@
 #include "hash_table.h"
 #include "trie.h"
 #include "msgs.h"
+#include "bit_array.h"
 
 #define LOG_NAME "bwd"
 #define LOG_VERSION "1.1"
@@ -42,6 +43,7 @@ typedef struct stat_node_s {
 	int last_updated;		/* when the statistics were updated */
 	int window_reset;		/* when the current window started */
 	int time_reported;		/* when las report wad done - 0 if not reported */
+	int id;					/* assigned unique id */
 
 	struct stat_node_s  *next_node;
 
@@ -61,6 +63,9 @@ typedef struct options_s {
 	char dbdump_file[MAX_STRING];	/* status file for database dump */
 	char exec_new[MAX_STRING];		/* command to exec new rule */
 	char exec_del[MAX_STRING];		/* command to exec to remove rule */
+	int	id_num;						/* number of numbers in id pool  */
+	int	id_last;					/* last assigned id (without offset) */
+	int	id_offset;					/* ide offset (100 = star with id 100) */
 
 //	hash_table_t hash_table;
 #define FLOW_DIR_SRC 	0
@@ -68,6 +73,7 @@ typedef struct options_s {
 	TTrieNode *trie4[2];
 	TTrieNode *trie6[2];
 	stat_node_t *root_node;
+	bit_array_t ids;
 
 } options_t;
 

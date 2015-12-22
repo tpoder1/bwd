@@ -63,6 +63,37 @@ void sig_alrm(int sig) {
 	
 }
 
+
+int get_next_id(options_t *opt) {
+
+	int i = 0;
+
+	if (opt->id_num	== 0) {
+		return 0;
+	}
+
+	/* the id is free */
+	while (bit_array_get(&opt->ids, opt->id_last) != 0) {
+
+		opt->id_last++;
+		i++;
+
+		if (opt->id_last >= opt->id_num) {
+			opt->id_last = 0;
+		}
+	
+		if (i > opt->id_num) {
+			msg(MSG_ERROR, "Can not find free id for rule.");
+			return 0;
+		}
+	}
+
+	bit_array_set(&opt->ids, opt->id_last, 1);
+
+	return opt->id_last;
+}
+
+
 int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action) {
 
 	char cmd[MAX_STRING];
@@ -75,6 +106,10 @@ int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action) {
 		default: return 0; break;
 	}
 
+	/* release id */
+	if (action == ACTION_NEW && opt->id_num != 0) {
+		stat_node->id = get_next_id(opt) + opt->id_offset;
+	}
 
 	fh = popen(cmd, "w");
 
@@ -95,6 +130,12 @@ int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action) {
 	if ( pclose(fh) != 0 ) {
 		msg(MSG_ERROR, "External command %s was not executed.", cmd);
 		return 0;
+	}
+
+	/* release id */
+	if (action == ACTION_DEL && opt->id_num != 0) {
+		bit_array_set(&opt->ids, stat_node->id - opt->id_offset, 0);
+		stat_node->id = 0;
 	}
 
 	return 1;
@@ -339,7 +380,11 @@ int main(int argc, char *argv[]) {
 		.remove_delay = 60, 
 		.treshold = 0.8,
 //		.expire_interval = 60 };
-		.expire_interval = 60 };
+		.expire_interval = 60,
+		.id_num = 9,
+//		.id_num = 10000,
+		.id_last = 0,
+		.id_offset = 10 };
 
 
 	strcpy(opt.config_file, "bwd.conf");	
@@ -367,6 +412,11 @@ int main(int argc, char *argv[]) {
 
 	active_opt = &opt;
     
+	if ( bit_array_init(&opt.ids, opt.id_num) == NULL ) {
+		msg(MSG_ERROR, "Can not ionitialise bit array\n");
+		opt.id_num = 0;
+	}
+
     expression = copy_argv(&argv[optind]);
            
 	if (device == NULL) {			// interface nebyl zadan explicitne

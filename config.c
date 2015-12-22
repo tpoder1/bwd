@@ -168,6 +168,7 @@ void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_
 	fprintf(fh, "dynamic_ipv4: %d\n", stat_node->dynamic_ipv4);
 	fprintf(fh, "dynamic_ipv6: %d\n", stat_node->dynamic_ipv6);
 	fprintf(fh, "treshold: %f\n", stat_node->treshold);
+	fprintf(fh, "id: %d\n", stat_node->id);
 //		printf("node: %p\n", stat_node);
 //		printf("next_node: %p\n", stat_node->next_node);
 
