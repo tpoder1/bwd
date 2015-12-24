@@ -99,17 +99,17 @@ int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action) {
 	char cmd[MAX_STRING];
 	FILE *fh;
 
-
-	switch (action) {
-		case ACTION_NEW: snprintf(cmd, MAX_STRING, "%s %s", opt->exec_new, "new"); break;
-		case ACTION_DEL: snprintf(cmd, MAX_STRING, "%s %s", opt->exec_new, "del"); break;
-		default: return 0; break;
-	}
-
 	/* release id */
 	if (action == ACTION_NEW && opt->id_num != 0) {
 		stat_node->id = get_next_id(opt) + opt->id_offset;
 	}
+
+	switch (action) {
+		case ACTION_NEW: snprintf(cmd, MAX_STRING, "%s %s %d", opt->exec_new, "new", stat_node->id); break;
+		case ACTION_DEL: snprintf(cmd, MAX_STRING, "%s %s %d", opt->exec_new, "del", stat_node->id); break;
+		default: return 0; break;
+	}
+
 
 	fh = popen(cmd, "w");
 
@@ -381,8 +381,8 @@ int main(int argc, char *argv[]) {
 		.treshold = 0.8,
 //		.expire_interval = 60 };
 		.expire_interval = 60,
-		.id_num = 9,
-//		.id_num = 10000,
+//		.id_num = 9,
+		.id_num = 10000,
 		.id_last = 0,
 		.id_offset = 10 };
 
