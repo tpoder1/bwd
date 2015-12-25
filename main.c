@@ -11,31 +11,46 @@
 #include <arpa/inet.h>
 #include "bwd.h"
 #include "msgs.h"
+#include "daemonize.h"
 //#include <netinet/tcp.h>
 
 pcap_t *dev;		// pouzivane rozhrani 
 
 long last_pkt = 0;
 long last_err = 0;
-long cnt = 0;
-int fl_debug = 0;
-int window = 10;	/* window size for evaluating */
-int step = 1;		/* reporting stem in Mbps */
-int drop_delay = 0;		/* wait with drop n secs */
+//long cnt = 0;
+//int fl_debug = 0;
+//int window = 10;	/* window size for evaluating */
+//int step = 1;		/* reporting stem in Mbps */
+//int drop_delay = 0;		/* wait with drop n secs */
 
 options_t *active_opt;
 
 
 void terminates(int sig) {
+
     struct pcap_stat stat;
+	stat_node_t *stat_node;
     
     if (dev != NULL && pcap_file(dev) == NULL) 
 	if (pcap_stats(dev, &stat) >= 0 && stat.ps_drop > 0) 
             msg(MSG_WARNING,"%lu packet dropped by kernel from %lu (%d%%).", 
 		    stat.ps_drop, stat.ps_recv, stat.ps_drop*100/stat.ps_recv);		
-    exit(0); /* libpcap uses onexit to clean up */
+
+	/* remove existing rules */
+
+	stat_node = active_opt->root_node;
+
+	while (stat_node != NULL) {
+		if ( stat_node->time_reported > 0 ) {
+			exec_node_cmd(active_opt, stat_node, ACTION_DEL);
+		}
+	}
+
+    exit(0); 
 }
     
+void dump_nodes_db(options_t *opt);
 void sig_usr1(int sig) {
     struct pcap_stat stat;
     if (dev != NULL && pcap_file(dev) == NULL) 
@@ -46,13 +61,10 @@ void sig_usr1(int sig) {
 	last_pkt = stat.ps_recv - last_pkt;
 	last_err = stat.ps_drop - last_err;
 	}
+
+	dump_nodes_db(active_opt);
     
 //    FlowExport();
-}
-
-void dump_nodes_db(options_t *opt);
-void sig_usr2(int sig) {
-	dump_nodes_db(active_opt);
 }
 
 void check_expired_nodes(options_t *opt);
@@ -325,7 +337,7 @@ inline void process_ip(const u_char *data, u_int32_t length) {
 
 
 // zpracovani ethernet paketu 
-inline void process_eth(u_char *user, const struct pcap_pkthdr *h, const u_char *p) {   
+void process_eth(u_char *user, const struct pcap_pkthdr *h, const u_char *p) {   
     u_int caplen = h->caplen; 
     struct ether_header *eth_header = (struct ether_header *) p;  // postupne orezavame hlavicky
         
@@ -366,11 +378,10 @@ char *copy_argv(char *argv[]) {
 
 int main(int argc, char *argv[]) {
     extern int optind;
-    char *device = NULL;
+//    char *device = NULL;
     char *expression = NULL;
     char ebuf[PCAP_ERRBUF_SIZE];
     char op;
-    int oflag = 1;
     int pflag = 0;
     struct bpf_program fcode;    // kvuli expr
 
@@ -387,22 +398,29 @@ int main(int argc, char *argv[]) {
 		.id_offset = 10 };
 
 
-	strcpy(opt.config_file, "bwd.conf");	
-	strcpy(opt.dbdump_file, "bwd.dbdump");	
-	strcpy(opt.exec_new, "./bwd.sh");	
-	strcpy(opt.exec_del, "./bwd.sh");	
+	strcpy(opt.config_file, "/etc/bwd/bwd.conf");	
+	strcpy(opt.dbdump_file, "/tmp/bwd.dbdump");	
+	strcpy(opt.exec_new, "/etc/bwd/bwd-new.sh");	
+	strcpy(opt.exec_del, "/etc/bwd/bwd-del.sh");	
 
 
     /*  process options */
-	while ((op = getopt(argc, argv, "i:w:s:d:ph:H:P:n:r:")) != -1) {
+	while ((op = getopt(argc, argv, "i:c:d:")) != -1) {
 		switch (op) {
-			case 'i' : device = optarg; break;
-			case 'O' : oflag = 0; break;
-			case 'p' : pflag = 1; break;
+			case 'i' : strncpy(opt.device,optarg, MAX_STRING); break;
+			case 'c' : strncpy(opt.config_file,optarg, MAX_STRING); break;
+//			case 'p' : pflag = 1; break;
 			case 'd' : opt.debug = atoi(optarg); break;
 			case '?' : help();
 			} // konec switch op 
     } // konec while op...
+
+	if (opt.debug == 0) {
+		if ( !daemonize() )  {
+			fprintf(stderr, "Can not daemonize process\n");
+			exit(1);
+		}
+	}
 
 	msg_init(opt.debug);
 
@@ -418,17 +436,19 @@ int main(int argc, char *argv[]) {
 	}
 
     expression = copy_argv(&argv[optind]);
-           
-	if (device == NULL) {			// interface nebyl zadan explicitne
-		device = pcap_lookupdev(ebuf);
-		if (device == NULL) {			// nenalezeno zadne rozhrani 
+          
+	/* 
+	if (opt.device == NULL) {			// interface nebyl zadan explicitne
+		opt.device = pcap_lookupdev(ebuf);
+		if (opt.device == NULL) {			// nenalezeno zadne rozhrani 
    		    msg(MSG_ERROR, ebuf);
 		    exit(1);
 		}					
     }
+	*/
 	
     //pokusime se otevrit interface
-    if ((dev = pcap_open_live(device, 68, pflag, 1100, ebuf)) == NULL) {
+    if ((dev = pcap_open_live(opt.device, 68, pflag, 1100, ebuf)) == NULL) {
 		msg(MSG_ERROR,ebuf);
 		exit(1);
     }
@@ -443,36 +463,11 @@ int main(int argc, char *argv[]) {
     }
 
     
-//    flow_init();		// otevreni portu, alokace pameti, vycisteni pameti 
-
-//	hash_table_init(&hash_table, HASH_TABLE_INIT_SIZE, aggr_callback, NULL, NULL);
-//	hash_table_entry_len(&hash_table, sizeof(stat_key_t), sizeof(stat_val_t));
-
-
-	/* create trie with specidied prefixes */
-/*
-	{
-	pTrieIPV4 = NULL;
-	uint32_t pref; 
-	int *pval;
-
-	inet_aton("147.229.250.248", (void *)&pref);
-	pval = malloc(sizeof(int));
-	*pval = 1;
-
-	printf("XXX %x\n", pref);
-	addPrefixToTrie((void *)&pref, 16, pval, &pTrieIPV4);
-
-
-	}	
-*/
-           
     signal(SIGINT, &terminates);
     signal(SIGUSR1, &sig_usr1);
-    signal(SIGUSR2, &sig_usr2);
     signal(SIGALRM, &sig_alrm);
 	       
-	msg(MSG_INFO, "Listening on %s.", device);	
+	msg(MSG_INFO, "Listening on %s.", opt.device);	
 	alarm(opt.expire_interval);
 
     if (pcap_loop(dev, -1, &process_eth, NULL) < 0) {	// start zachytavani 

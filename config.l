@@ -24,6 +24,7 @@
 %option noyywrap 
 %option nounput
 %option noinput
+%option yylineno
 
 %{
 	#include <stdlib.h>
@@ -34,9 +35,30 @@
 
 %%
 #.*				{ ; }	// comments 
+\"(.+)\"			{
+					strncpy(yylval->string, yytext + 1, MAX_STRING - 1);
+					yylval->string[yyleng - 2] = '\0';
+					return STRING;
+				}
 \{				return OBRACE;
 \}				return EBRACE;
 ;				return SEMICOLON;
+options			return OPTIONSTOK; 
+interface		return IFACETOK; 
+dbdump			return DBDUMPTOK; 
+file			return FILETOK; 
+debug			return DEBUGTOK; 
+level			return LEVELTOK; 
+command			return COMMANDTOK; 
+new				return NEWTOK; 
+del				return DELTOK; 
+treshold		return TRESHOLDTOK; 
+window			return WINDOWTOK; 
+size			return SIZETOK; 
+expire			return EXPIRETOK; 
+delay			return DELAYTOK; 
+id				return IDTOK; 
+offset			return OFFSETTOK; 
 rule			return RULETOK; 
 limit			return LIMITTOK; 
 src				return SRCTOK; 

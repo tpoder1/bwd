@@ -4,7 +4,7 @@ distdir = bwd
 main:
 	lex config.l
 	bison -d config.y
-	gcc -O3 msgs.c main.c hash_table.c xxhash.c trie.c lex.yy.c config.tab.c config.c bit_array.c -lpcap -pthread -Wall -finline-functions \
+	gcc -O3 msgs.c main.c hash_table.c xxhash.c trie.c lex.yy.c config.tab.c config.c bit_array.c daemonize.c -lpcap -pthread -Wall -finline-functions \
 	    -L/usr/local/lib/ \
 	    -o bwd
 

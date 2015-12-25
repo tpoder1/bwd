@@ -51,7 +51,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 	//void yyerror(yyscan_t scanner, ff_t *filter, char *msg) {
 	void yyerror(yyscan_t scanner, options_t *opt, char *errmsg) {
 
-		msg(MSG_ERROR, "config file: %s\n", errmsg);
+		msg(MSG_ERROR, "config file: %s (line: %d)\n", errmsg, yyget_lineno(scanner) );
 //		ff_set_error(filter, msg);
 	}
 
@@ -70,16 +70,41 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 %token OBRACE EBRACE SLASH SEMICOLON
 %token RULETOK LIMITTOK SRCTOK DSTTOK IPTOK 
 %token DYNAMICTOK IPV4TOK IPV6TOK BITPSTOK PPSTOK
+%token IFACETOK OPTIONSTOK DBDUMPTOK DEBUGTOK FILETOK
+%token LEVELTOK COMMANDTOK NEWTOK DELTOK TRESHOLDTOK 
+%token WINDOWTOK SIZETOK EXPIRETOK DELAYTOK IDTOK OFFSETTOK
 %token <number> NUMBER FACTOR
 %token <ipv4> IPV4ADDR 
 %token <ipv6> IPV6ADDR
+%token <string> STRING
 %type <stat_node> rule rules ruleparam ruleparams 
-
+/* %type <string> options optionparams option */
 
 %%
 
 config: /* empty */
-	| rules;
+	options rules
+	;
+
+options: /* empty */
+	OPTIONSTOK OBRACE optionparams EBRACE; 
+	;
+
+optionparams: /* empty */ 
+	| optionparams option SEMICOLON;
+	;
+
+option:
+	| IFACETOK STRING 				{ strncpy(opt->device, $2, MAX_STRING); }
+	| DEBUGTOK LEVELTOK NUMBER 		{ opt->debug = $3; }
+	| DBDUMPTOK FILETOK STRING 		{ strncpy(opt->dbdump_file, $3, MAX_STRING); }
+	| NEWTOK COMMANDTOK STRING 		{ strncpy(opt->exec_new, $3, MAX_STRING); }
+	| DELTOK COMMANDTOK STRING 		{ strncpy(opt->exec_del, $3, MAX_STRING); }
+	| TRESHOLDTOK NUMBER 			{ opt->treshold = $2; }
+	| WINDOWTOK SIZETOK NUMBER 		{ opt->window_size = $3; }
+	| EXPIRETOK DELAYTOK NUMBER 	{ opt->expire_interval = $3; }
+	| DELTOK DELAYTOK NUMBER 		{ opt->remove_delay = $3; }
+	| IDTOK OFFSETTOK NUMBER 		{ opt->id_offset = $3; }
 	;
 
 rules: /* empty */
@@ -99,8 +124,8 @@ ruleparam:
 	| LIMITTOK NUMBER BITPSTOK 				{ $<stat_node>0->limit_bps = $2; }
 	| LIMITTOK NUMBER FACTOR PPSTOK 		{ $<stat_node>0->limit_pps = $2 * $3; }
 	| LIMITTOK NUMBER PPSTOK 				{ $<stat_node>0->limit_pps = $2; }
-	| DYNAMICTOK IPV4TOK NUMBER 			{ $<stat_node>0->dynamic_ipv4 = $3; }
-	| DYNAMICTOK IPV6TOK NUMBER 			{ $<stat_node>0->dynamic_ipv6 = $3; }
+	| DYNAMICTOK IPV4TOK NUMBER 			{ if ($3 <= 32 )  { $<stat_node>0->dynamic_ipv4 = $3; } }
+	| DYNAMICTOK IPV6TOK NUMBER 			{ if ($3 <= 128 ) { $<stat_node>0->dynamic_ipv6 = $3; } }
 	| SRCTOK IPTOK IPV4ADDR 				{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, $3, 32, $<stat_node>0) ) { YYABORT; }  ; }
 	| SRCTOK IPTOK IPV6ADDR 				{ if ( !stat_node_add(opt, AF_INET6, FLOW_DIR_SRC, $3, 128, $<stat_node>0) ) { YYABORT; }  ; }
 	| SRCTOK IPTOK IPV4ADDR SLASH NUMBER 	{ if ( !stat_node_add(opt, AF_INET, FLOW_DIR_SRC, $3, $5, $<stat_node>0) ) { YYABORT; }  ; }

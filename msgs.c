@@ -55,15 +55,13 @@ void msg(int type, char* msg, ...) {
 * help
 */
 void help() {
-    msg(MSG_INFO, "Welcome traffic analyses %s", LOG_VERSION);
+    msg(MSG_INFO, "Welcome bandwidth daemon %s", LOG_VERSION);
     msg(MSG_INFO, "Comment please send to <tpoder@cis.vutbr.cz>");
+    msg(MSG_INFO, "Project homepage: http://github.com/tpoder1/bwd");
     msg(MSG_INFO, "");
-    msg(MSG_INFO, "Usage: trafscan [-i <interface>] [-p] [ -w windows size ] [ -s step size ] [ -r drop ignore ]  ");
-    msg(MSG_INFO, "               [-t <time period>] [<expression>]"); 
+    msg(MSG_INFO, "Usage: bwd [-i <interface>] [ -c <config_file> ] [ -d <debug_level> ]  ");
     msg(MSG_INFO, ""); 
-    msg(MSG_INFO, "-i <interface>   Listen on interface."); 
-    msg(MSG_INFO, "-p               Put the interface into promiscuous mode."); 
-    msg(MSG_INFO, "<expression>     Same expression as in tcpdump. See man tcpdump."); 
+    msg(MSG_INFO, ""); 
     msg(MSG_INFO, ""); 
     exit(0);
 }
