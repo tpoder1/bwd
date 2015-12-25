@@ -45,6 +45,7 @@ void terminates(int sig) {
 		if ( stat_node->time_reported > 0 ) {
 			exec_node_cmd(active_opt, stat_node, ACTION_DEL);
 		}
+		stat_node = stat_node->next_node;
 	}
 
     exit(0); 
