@@ -37,10 +37,10 @@ int daemonize(void) {
         }
                
         /* Change the current working directory */
-        if ((chdir("/")) < 0) {
+//        if ((chdir("/")) < 0) {
                 /* Log the failure */
-                return 0;
-        }
+ //               return 0;
+  //      }
         
         /* Close out the standard file descriptors */
 		//Because daemons generally dont interact directly with user so there is no need of keeping these open

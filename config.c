@@ -40,7 +40,7 @@ int parse_config(options_t *opt) {
 	fp = fopen(opt->config_file, "r");
 
 	if (fp == NULL) {
-		msg(MSG_INFO, "Can't open file %s", opt->config_file);
+		msg(MSG_INFO, "Can't open file %s (%s)", opt->config_file, strerror(errno));
 		return 0;
 	}
 
@@ -53,7 +53,7 @@ int parse_config(options_t *opt) {
 	yylex_destroy(scanner);
 
 	if (parse_ret == 0) {
-		msg(MSG_DEBUG, "Config file parsed");
+		msg(MSG_INFO, "Config file parsed");
 		return 1;
 	} else {
 		msg(MSG_ERROR, "Can't load config file");

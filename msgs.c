@@ -29,7 +29,7 @@ void msg(int type, char* msg, ...) {
 	int level;
 	char buf[MAX_STRING];
 
-	if (!log_debug && type == LOG_DEBUG) {
+	if (type == LOG_DEBUG && log_debug > 0) {
 		return;	
 	}
 
@@ -44,10 +44,10 @@ void msg(int type, char* msg, ...) {
 	vsnprintf(buf, MAX_STRING - 1, msg, arg);
 	va_end(arg);
 
+	syslog(level, "%s", buf);
 	if (log_debug) {
 		printf("%s\n", buf);
 	}
-	syslog(level, "%s", buf);
     
 }
 

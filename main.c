@@ -48,6 +48,8 @@ void terminates(int sig) {
 		stat_node = stat_node->next_node;
 	}
 
+	msg(MSG_INFO, "Existing rules removed, terminating");
+
     exit(0); 
 }
     
@@ -406,17 +408,18 @@ int main(int argc, char *argv[]) {
 
 
     /*  process options */
-	while ((op = getopt(argc, argv, "i:c:d:")) != -1) {
+	while ((op = getopt(argc, argv, "i:c:d:F")) != -1) {
 		switch (op) {
 			case 'i' : strncpy(opt.device,optarg, MAX_STRING); break;
 			case 'c' : strncpy(opt.config_file,optarg, MAX_STRING); break;
 //			case 'p' : pflag = 1; break;
 			case 'd' : opt.debug = atoi(optarg); break;
+			case 'F' : opt.foreground = 1; break;
 			case '?' : help();
 			} // konec switch op 
     } // konec while op...
 
-	if (opt.debug == 0) {
+	if (opt.foreground == 0) {
 		if ( !daemonize() )  {
 			fprintf(stderr, "Can not daemonize process\n");
 			exit(1);

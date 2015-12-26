@@ -54,6 +54,7 @@ typedef struct stat_node_s {
 typedef struct options_s {
 
 	int debug;						/* debug mode */
+	int foreground;					/* do not daemonize */
 	char device[MAX_STRING]; 	/* interface name */
 	double treshold;   				/* treshold (0.78 = 78%) */
 	int window_size; 	 			/* window size to evaluate (in seconds) */
