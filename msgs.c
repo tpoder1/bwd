@@ -59,9 +59,10 @@ void help() {
     msg(MSG_INFO, "Comment please send to <tpoder@cis.vutbr.cz>");
     msg(MSG_INFO, "Project homepage: http://github.com/tpoder1/bwd");
     msg(MSG_INFO, "");
-    msg(MSG_INFO, "Usage: bwd [-i <interface>] [ -c <config_file> ] [ -d <debug_level> ]  ");
+    msg(MSG_INFO, "Usage: bwd [-i <interface>] [ -c <config_file> ] [ -d <debug_level> ] [ -F ] ");
     msg(MSG_INFO, ""); 
-    msg(MSG_INFO, ""); 
+    msg(MSG_INFO, "-c config file (default: /etc/bwd/bwd.conf)"); 
+    msg(MSG_INFO, "-F run in foregrounf"); 
     msg(MSG_INFO, ""); 
     exit(0);
 }
