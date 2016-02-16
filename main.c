@@ -162,31 +162,33 @@ void eval_node(options_t *opt, unsigned int bytes, unsigned int pkts, stat_node_
 
 	stat_node->last_updated = time(NULL);
 
-	// reset window 
-	if (stat_node->last_updated >= stat_node->window_reset + stat_node->window_size) {
-		stat_node->window_reset = stat_node->last_updated;
-		stat_node->stats_bytes = 0;
-		stat_node->stats_pkts = 0;			
-	} else {
-		stat_node->stats_bytes += bytes;
-		stat_node->stats_pkts += pkts;
-	}
-
+	stat_node->stats_bytes += bytes;
+	stat_node->stats_pkts += pkts;
 
 	/* over limit */
-	if (stat_node->stats_bytes / stat_node->window_size * 8 > stat_node->limit_bps * stat_node->treshold) { 
+	if (stat_node->stats_bytes / stat_node->window_size * 8 * 100 > stat_node->limit_bps * stat_node->treshold) { 
 		if (stat_node->time_reported == 0) {
 			exec_node_cmd(opt, stat_node, ACTION_NEW);
-			stat_node->time_reported = stat_node->last_updated;
 		}
+		stat_node->time_reported = stat_node->last_updated;
 	/* under limit */
 	} else {
 		
 		if (stat_node->time_reported != 0 && stat_node->time_reported + stat_node->remove_delay < stat_node->last_updated) {
-			exec_node_cmd(opt, stat_node, ACTION_DEL);
-			stat_node->time_reported = 0;
+			if (stat_node->last_updated >= stat_node->window_reset + stat_node->window_size) {
+				exec_node_cmd(opt, stat_node, ACTION_DEL);
+				stat_node->time_reported = 0;
+			}
 		}
 	}
+
+	// reset window 
+	if (stat_node->last_updated >= stat_node->window_reset + stat_node->window_size) {
+		stat_node->window_reset = stat_node->last_updated;
+		stat_node->stats_bytes = 0;
+		stat_node->stats_pkts = 0;
+	}
+
 }
 
 /* pass yhrough all rules and update expired */

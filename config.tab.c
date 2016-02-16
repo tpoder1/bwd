@@ -1517,7 +1517,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 106 "config.y"
-    { opt->remove_delay = (yyvsp[(3) - (3)].number); ;}
+    { opt->remove_delay = (yyvsp[(3) - (3)].number); opt->expire_interval = (yyvsp[(3) - (3)].number); ;}
     break;
 
   case 16:

@@ -103,7 +103,7 @@ option:
 	| TRESHOLDTOK NUMBER 			{ opt->treshold = $2; }
 	| WINDOWTOK SIZETOK NUMBER 		{ opt->window_size = $3; }
 	| EXPIRETOK DELAYTOK NUMBER 	{ opt->expire_interval = $3; }
-	| DELTOK DELAYTOK NUMBER 		{ opt->remove_delay = $3; }
+	| DELTOK DELAYTOK NUMBER 		{ opt->remove_delay = $3; opt->expire_interval = $3; }
 	| IDTOK OFFSETTOK NUMBER 		{ opt->id_offset = $3; }
 	;
 
