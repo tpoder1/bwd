@@ -1,8 +1,10 @@
-/* A Bison parser, made by GNU Bison 2.7.12-4996.  */
 
-/* Bison interface for Yacc-like parsers in C
+/* A Bison parser, made by GNU Bison 2.4.1.  */
+
+/* Skeleton interface for Bison's Yacc-like parsers in C
    
-      Copyright (C) 1984, 1989-1990, 2000-2013 Free Software Foundation, Inc.
+      Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+   Free Software Foundation, Inc.
    
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -30,15 +32,6 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-#ifndef YY_YY_CONFIG_TAB_H_INCLUDED
-# define YY_YY_CONFIG_TAB_H_INCLUDED
-/* Enabling traces.  */
-#ifndef YYDEBUG
-# define YYDEBUG 0
-#endif
-#if YYDEBUG
-extern int yydebug;
-#endif
 
 /* Tokens.  */
 #ifndef YYTOKENTYPE
@@ -85,10 +78,12 @@ extern int yydebug;
 #endif
 
 
+
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
 {
-/* Line 2053 of yacc.c  */
+
+/* Line 1676 of yacc.c  */
 #line 62 "config.y"
 
 	long int	number;	
@@ -99,8 +94,9 @@ typedef union YYSTYPE
 	stat_node_t	*stat_node;
 
 
-/* Line 2053 of yacc.c  */
-#line 104 "config.tab.h"
+
+/* Line 1676 of yacc.c  */
+#line 100 "config.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -108,18 +104,5 @@ typedef union YYSTYPE
 #endif
 
 
-#ifdef YYPARSE_PARAM
-#if defined __STDC__ || defined __cplusplus
-int yyparse (void *YYPARSE_PARAM);
-#else
-int yyparse ();
-#endif
-#else /* ! YYPARSE_PARAM */
-#if defined __STDC__ || defined __cplusplus
-int yyparse (yyscan_t scanner, options_t *opt);
-#else
-int yyparse ();
-#endif
-#endif /* ! YYPARSE_PARAM */
 
-#endif /* !YY_YY_CONFIG_TAB_H_INCLUDED  */
+

@@ -42,7 +42,7 @@ typedef struct stat_node_s {
 
 	int last_updated;		/* when the statistics were updated */
 	int window_reset;		/* when the current window started */
-	int time_reported;		/* when las report wad done - 0 if not reported */
+	int time_reported;		/* when last report was done - 0 if not reported */
 	int id;					/* assigned unique id */
 
 	struct stat_node_s  *next_node;

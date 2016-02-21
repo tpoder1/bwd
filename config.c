@@ -30,6 +30,105 @@ typedef void* yyscan_t;
 typedef struct yy_buffer_state *YY_BUFFER_STATE;
 #endif
 
+
+/* compare items of two nodes */
+int stats_node_cmp(stat_node_t *n1, stat_node_t *n2) {
+
+	if (n1->num_prefixes != n2->num_prefixes) { return 1; }
+	if (n1->limit_bps != n2->limit_bps) { return 1; }
+	if (n1->limit_pps != n2->limit_pps) { return 1; }
+	if (n1->treshold != n2->treshold) { return 1; }
+	if (n1->window_size != n2->window_size) { return 1; }
+	if (n1->remove_delay != n2->remove_delay) { return 1; }
+	if (n1->dynamic_ipv4 != n2->dynamic_ipv4) { return 1; }
+	if (n1->dynamic_ipv6 != n2->dynamic_ipv6) { return 1; }
+
+	return memcmp(n1->prefixes, n2->prefixes, sizeof(n2->prefixes));
+
+}
+
+
+/* walk via all _op nodes 
+  if  the node is active then check configuration and if 
+  the config is differend delete the rule 
+*/
+int update_config(options_t *opt) {
+
+	stat_node_t *stat_node, *new_stat_node;
+	TTrieNode *pTn, *trie;
+	ip_prefix_t *ppref;
+	int addrlen;
+	char *addr;
+
+	while (opt->op_root_node != NULL) {
+
+		stat_node = opt->op_root_node;
+		opt->op_root_node = stat_node->next_node;
+
+		/* active node */
+		if (stat_node->time_reported > 0) {
+	
+			/* lookup for simmilar node in the new configuration */
+			/* check firt prefix is enough to do it */
+			if (stat_node->num_prefixes > 0) {
+				ppref = &stat_node->prefixes[0];
+			
+				switch (ppref->af) {
+					case AF_INET: 
+						addrlen = sizeof(uint32_t);
+						trie = opt->cf_trie4[ppref->flow_dir];
+						addr = (char *)&ppref->ip.v4;
+						break;
+				case AF_INET6: 
+						addrlen = sizeof(uint32_t[4]);
+						trie = opt->cf_trie6[ppref->flow_dir];
+						addr = (char *)&ppref->ip.v6;
+						break;
+				default:
+						addrlen = 0;
+						trie = NULL;
+						addr = NULL;
+						break;
+				}
+
+				pTn = lookupAddress((void *)addr, addrlen * 8, trie);
+
+				if (pTn != NULL && pTn->hasValue) {
+					new_stat_node = pTn->Value;
+
+					/* compare the content of the old and the new node */
+					if (stats_node_cmp(stat_node, new_stat_node) == 0) {
+						/* new node have same configuration - just copy some data from the old one */
+						new_stat_node->stats_bytes = stat_node->stats_bytes;
+						new_stat_node->stats_pkts = stat_node->stats_pkts;
+						new_stat_node->last_updated = stat_node->last_updated;
+						new_stat_node->window_reset = stat_node->window_reset;
+						new_stat_node->time_reported = stat_node->time_reported;
+						new_stat_node->id = stat_node->id;
+					} else {
+						/* differend configuration - remove the existing rule */
+						exec_node_cmd(opt, stat_node, ACTION_DEL);
+					}
+				}
+
+
+			} else {
+				/* therw were no prefixes defined so the rule might not exist, just for sure remove rule */
+				exec_node_cmd(opt, stat_node, ACTION_DEL);
+			}
+
+		}
+
+		free(stat_node);
+
+    }
+
+
+	/* cleanup trie structures */
+
+	return 0;	
+}
+
 int parse_config(options_t *opt) {
 
 	yyscan_t scanner;
