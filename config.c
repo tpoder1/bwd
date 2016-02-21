@@ -155,8 +155,9 @@ void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_
 				buf[0] = '\0';
 			}
 
-		fprintf(fh, "%sip: %s/%d \n", 
+		fprintf(fh, "%sip%c: %s/%d \n", 
 						ppref->flow_dir == FLOW_DIR_SRC ? "src" : "dst", 
+						ppref->af == AF_INET ? '4' : '6',
 						buf, ppref->prefixlen );
 
 	}

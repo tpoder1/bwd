@@ -410,16 +410,19 @@ int main(int argc, char *argv[]) {
 
 
     /*  process options */
-	while ((op = getopt(argc, argv, "i:c:d:F")) != -1) {
+	while ((op = getopt(argc, argv, "i:c:d:F?h")) != -1) {
 		switch (op) {
 			case 'i' : strncpy(opt.device,optarg, MAX_STRING); break;
 			case 'c' : strncpy(opt.config_file,optarg, MAX_STRING); break;
 //			case 'p' : pflag = 1; break;
 			case 'd' : opt.debug = atoi(optarg); break;
 			case 'F' : opt.foreground = 1; break;
-			case '?' : help();
+			case 'h' :
+			case '?' : opt.debug = 1; opt.foreground = 1; msg_init(opt.debug); help(); break;
 			} // konec switch op 
     } // konec while op...
+
+	msg_init(opt.debug);
 
 	if (opt.foreground == 0) {
 		if ( !daemonize() )  {
@@ -428,7 +431,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	msg_init(opt.debug);
 
 	if (!parse_config(&opt)) {
 		exit(1);
