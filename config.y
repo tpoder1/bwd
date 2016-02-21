@@ -29,6 +29,7 @@
 %{
 	#include <stdio.h>
 	#include "bwd.h"
+	#include <string.h>
 //	#include "ffilter.h"
 //	#include "ffilter_internal.h"
 

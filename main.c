@@ -39,7 +39,7 @@ void terminates(int sig) {
 
 	/* remove existing rules */
 
-	stat_node = active_opt->root_node;
+	stat_node = active_opt->op_root_node;
 
 	while (stat_node != NULL) {
 		if ( stat_node->time_reported > 0 ) {
@@ -196,7 +196,7 @@ void check_expired_nodes(options_t *opt) {
 
 	stat_node_t *stat_node;
 
-	stat_node = opt->root_node;
+	stat_node = opt->op_root_node;
 
 	while (stat_node != NULL) {
 
@@ -223,7 +223,7 @@ void dump_nodes_db(options_t *opt) {
 		return;
 	}
 
-	stat_node = opt->root_node;
+	stat_node = opt->op_root_node;
 
 	while (stat_node != NULL) {
 
@@ -256,10 +256,10 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 	/* detect address length */
 	if (af == AF_INET) {
 		addrlen = sizeof(uint32_t);
-		trie = opt->trie4[flow_dir];
+		trie = opt->op_trie4[flow_dir];
 	} else {
 		addrlen = sizeof(uint32_t[4]);
-		trie = opt->trie6[flow_dir];
+		trie = opt->op_trie6[flow_dir];
 	}
 
 	
@@ -291,11 +291,11 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 				if (af == AF_INET) {
 					memcpy(&ppref->ip.v4, addr, addrlen);
 					ppref->prefixlen = stat_node->dynamic_ipv4;
-					addPrefixToTrie((void *)&(ppref->ip.v4), ppref->prefixlen, new_node, &opt->trie4[flow_dir]);
+					addPrefixToTrie((void *)&(ppref->ip.v4), ppref->prefixlen, new_node, &opt->op_trie4[flow_dir]);
 				} else {
 					memcpy(&ppref->ip.v6, addr, addrlen);
 					ppref->prefixlen = stat_node->dynamic_ipv6;
-					addPrefixToTrie((void *)&(ppref->ip.v6), ppref->prefixlen, new_node, &opt->trie6[flow_dir]);
+					addPrefixToTrie((void *)&(ppref->ip.v6), ppref->prefixlen, new_node, &opt->op_trie6[flow_dir]);
 				}
 
 				if (opt->debug > 10) {
