@@ -54,8 +54,18 @@ int parse_config(options_t *opt) {
 
 	if (parse_ret == 0) {
 		msg(MSG_INFO, "Config file parsed");
+
+		/* switch to the new configuration */
+		opt->op_trie4[FLOW_DIR_SRC] = opt->cf_trie4[FLOW_DIR_SRC];
+		opt->op_trie4[FLOW_DIR_DST] = opt->cf_trie4[FLOW_DIR_DST];
+		opt->op_trie6[FLOW_DIR_SRC] = opt->cf_trie6[FLOW_DIR_SRC];
+		opt->op_trie6[FLOW_DIR_DST] = opt->cf_trie6[FLOW_DIR_DST];
+		opt->op_root_node = opt->cf_root_node;
+
 		return 1;
 	} else {
+
+		/* keep the old config */
 		msg(MSG_ERROR, "Can't load config file");
 		return 0;
 	}
@@ -76,8 +86,8 @@ stat_node_t * stat_node_new(options_t *opt) {
 	tmp->remove_delay = opt->remove_delay;
 	tmp->treshold = opt->treshold;
 
-	tmp->next_node = opt->root_node;
-	opt->root_node = tmp;
+	tmp->next_node = opt->cf_root_node;
+	opt->cf_root_node = tmp;
 
 	return tmp;
 }
@@ -99,11 +109,11 @@ int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int 
 		switch (af) {
 
 			case AF_INET:	/* IPV4 */
-				addPrefixToTrie((void *)&buf, prefixlen, stat_node, &(opt->trie4[direction]));
+				addPrefixToTrie((void *)&buf, prefixlen, stat_node, &(opt->cf_trie4[direction]));
 				memcpy(&ppref->ip.v4, &buf, sizeof(ppref->ip.v4));
 				break;
 			case AF_INET6: /* IPV6 */
-				addPrefixToTrie((void *)&buf, prefixlen, stat_node, &(opt->trie6[direction]));
+				addPrefixToTrie((void *)&buf, prefixlen, stat_node, &(opt->cf_trie6[direction]));
 				memcpy(&ppref->ip.v4, &buf, sizeof(ppref->ip.v6));
 				break;
 			default:

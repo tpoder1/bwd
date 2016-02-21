@@ -72,9 +72,18 @@ typedef struct options_s {
 //	hash_table_t hash_table;
 #define FLOW_DIR_SRC 	0
 #define FLOW_DIR_DST 	1
-	TTrieNode *trie4[2];
-	TTrieNode *trie6[2];
-	stat_node_t *root_node;
+
+	/* structures used by the current config */
+	TTrieNode *op_trie4[2];
+	TTrieNode *op_trie6[2];
+	stat_node_t *op_root_node;
+
+	/* temporary structures for loading config */
+	TTrieNode *cf_trie4[2];
+	TTrieNode *cf_trie6[2];
+	stat_node_t *cf_root_node;
+
+	/* bit array of allocated ids */
 	bit_array_t ids;
 
 } options_t;
@@ -91,4 +100,6 @@ int parse_config(options_t *opt);
 stat_node_t * stat_node_new(options_t *opt);
 int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int prefixlen, stat_node_t *stat_node);
 void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_node);
+
+int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action);
 
