@@ -50,6 +50,8 @@ void terminates(int sig) {
 
 	msg(MSG_INFO, "Existing rules removed, terminating");
 
+	unlink(active_opt->pid_file);
+
     exit(0); 
 }
     
@@ -395,6 +397,27 @@ char *copy_argv(char *argv[]) {
   return buf;
 }
 
+int mkpidfile(options_t *opt) {
+
+	FILE * fp;
+	int pid;
+
+	fp = fopen(opt->pid_file, "w");
+
+	if (fp == NULL) {
+		msg(MSG_INFO, "Can't create PID file %s (%s)", opt->pid_file, strerror(errno));
+		return 0;
+	}
+
+	pid = getpid();
+	fprintf(fp,"%d\n", pid);
+
+	fclose(fp);
+
+	return 1;
+
+}
+
 int main(int argc, char *argv[]) {
     extern int optind;
 //    char *device = NULL;
@@ -419,6 +442,7 @@ int main(int argc, char *argv[]) {
 
 	strcpy(opt.config_file, "/etc/bwd/bwd.conf");	
 	strcpy(opt.dbdump_file, "/tmp/bwd.dbdump");	
+	strcpy(opt.pid_file, "/var/run/bwd.pid");	
 	strcpy(opt.exec_new, "/etc/bwd/bwd-new.sh");	
 	strcpy(opt.exec_del, "/etc/bwd/bwd-del.sh");	
 
@@ -428,6 +452,7 @@ int main(int argc, char *argv[]) {
 		switch (op) {
 			case 'i' : strncpy(opt.device,optarg, MAX_STRING); break;
 			case 'c' : strncpy(opt.config_file,optarg, MAX_STRING); break;
+			case 'p' : strncpy(opt.pid_file,optarg, MAX_STRING); break;
 //			case 'p' : pflag = 1; break;
 			case 'd' : opt.debug = atoi(optarg); break;
 			case 'F' : opt.foreground = 1; break;
@@ -444,6 +469,8 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 	}
+
+	mkpidfile(&opt);
 
 
 	if (!parse_config(&opt)) {

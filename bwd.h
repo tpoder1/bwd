@@ -63,6 +63,7 @@ typedef struct options_s {
 	int last_expire_check;			/* timestam of last expire check */
 	char config_file[MAX_STRING];	/* config gile name */
 	char dbdump_file[MAX_STRING];	/* status file for database dump */
+	char pid_file[MAX_STRING];		/* filw with PID */
 	char exec_new[MAX_STRING];		/* command to exec new rule */
 	char exec_del[MAX_STRING];		/* command to exec to remove rule */
 	int	id_num;						/* number of numbers in id pool  */
