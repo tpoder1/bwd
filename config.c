@@ -67,7 +67,7 @@ int update_config(options_t *opt) {
 
 		/* active node */
 		if (stat_node->time_reported > 0) {
-	
+
 			/* lookup for simmilar node in the new configuration */
 			/* check firt prefix is enough to do it */
 			if (stat_node->num_prefixes > 0) {
@@ -125,8 +125,7 @@ int update_config(options_t *opt) {
 
 
 	/* cleanup trie structures */
-
-	return 0;	
+	return 1;	
 }
 
 int parse_config(options_t *opt) {
@@ -151,17 +150,36 @@ int parse_config(options_t *opt) {
 
 	yylex_destroy(scanner);
 
+	//fclose(fp);
+
 	if (parse_ret == 0) {
 		msg(MSG_INFO, "Config file parsed");
 
 		/* switch to the new configuration */
-		opt->op_trie4[FLOW_DIR_SRC] = opt->cf_trie4[FLOW_DIR_SRC];
-		opt->op_trie4[FLOW_DIR_DST] = opt->cf_trie4[FLOW_DIR_DST];
-		opt->op_trie6[FLOW_DIR_SRC] = opt->cf_trie6[FLOW_DIR_SRC];
-		opt->op_trie6[FLOW_DIR_DST] = opt->cf_trie6[FLOW_DIR_DST];
-		opt->op_root_node = opt->cf_root_node;
+		if (update_config(opt)) {
+			freeTrieNode(opt->op_trie4[FLOW_DIR_SRC]);
+			freeTrieNode(opt->op_trie4[FLOW_DIR_DST]);
+			freeTrieNode(opt->op_trie6[FLOW_DIR_SRC]);
+			freeTrieNode(opt->op_trie6[FLOW_DIR_DST]);
 
-		return 1;
+			opt->op_trie4[FLOW_DIR_SRC] = opt->cf_trie4[FLOW_DIR_SRC];
+			opt->op_trie4[FLOW_DIR_DST] = opt->cf_trie4[FLOW_DIR_DST];
+			opt->op_trie6[FLOW_DIR_SRC] = opt->cf_trie6[FLOW_DIR_SRC];
+			opt->op_trie6[FLOW_DIR_DST] = opt->cf_trie6[FLOW_DIR_DST];
+			/* allocated memory for opt->op_root_node is released by update_config */
+			opt->op_root_node = opt->cf_root_node;
+
+			/* clanup old data */
+			opt->cf_trie4[FLOW_DIR_SRC] = NULL;
+			opt->cf_trie4[FLOW_DIR_DST] = NULL;
+			opt->cf_trie6[FLOW_DIR_SRC] = NULL;
+			opt->cf_trie6[FLOW_DIR_DST] = NULL;
+			opt->cf_root_node = NULL;
+			return 1;
+		} else {
+			return 0;
+		}
+
 	} else {
 
 		/* keep the old config */

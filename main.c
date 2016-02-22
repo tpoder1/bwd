@@ -56,6 +56,7 @@ void terminates(int sig) {
 void dump_nodes_db(options_t *opt);
 void sig_usr1(int sig) {
     struct pcap_stat stat;
+	msg(MSG_INFO, "Request for database dump and statistics");
     if (dev != NULL && pcap_file(dev) == NULL) 
 	if (pcap_stats(dev, &stat) >= 0 && (stat.ps_drop - last_err) > 0) {
             msg(MSG_WARNING,"%lu packet dropped by kernel from %lu (%d%%).", 
@@ -68,6 +69,15 @@ void sig_usr1(int sig) {
 	dump_nodes_db(active_opt);
     
 //    FlowExport();
+}
+
+void sig_hup(int sig) {
+
+	msg(MSG_INFO, "Request for load new configuration");
+	if (!parse_config(active_opt)) {
+		 msg(MSG_ERROR, "Continuing with the previous configuration");
+	}
+    
 }
 
 void check_expired_nodes(options_t *opt);
@@ -165,6 +175,8 @@ void eval_node(options_t *opt, unsigned int bytes, unsigned int pkts, stat_node_
 	stat_node->stats_bytes += bytes;
 	stat_node->stats_pkts += pkts;
 
+
+
 	/* over limit */
 	if (stat_node->stats_bytes / stat_node->window_size * 8 * 100 > stat_node->limit_bps * stat_node->treshold) { 
 		if (stat_node->time_reported == 0) {
@@ -252,6 +264,7 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 	ip_prefix_t *ppref;
 
 	int addrlen;
+
 
 	/* detect address length */
 	if (af == AF_INET) {
@@ -345,6 +358,7 @@ inline void process_ip(const u_char *data, u_int32_t length) {
 void process_eth(u_char *user, const struct pcap_pkthdr *h, const u_char *p) {   
     u_int caplen = h->caplen; 
     struct ether_header *eth_header = (struct ether_header *) p;  // postupne orezavame hlavicky
+
         
     if (ntohs(eth_header->ether_type) == ETHERTYPE_IP) {          // je to IP protokol 
 		process_ip(p + sizeof(struct ether_header), 
@@ -474,6 +488,7 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, &terminates);
     signal(SIGUSR1, &sig_usr1);
     signal(SIGALRM, &sig_alrm);
+    signal(SIGHUP, &sig_hup);
 	       
 	msg(MSG_INFO, "Listening on %s.", opt.device);	
 	alarm(opt.expire_interval);

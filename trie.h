@@ -24,6 +24,5 @@ typedef struct AlocTrieNodes{
 
 void addPrefixToTrie(unsigned char *prefix, unsigned char prefixLen, void * Value,  TTrieNode **ppTrie);
 TTrieNode *lookupAddress(unsigned char *address, int addrLen, TTrieNode *pTN);
-void freeAlocTrieNodes(TAlocTrieNodes *pATN);
-
+void freeTrieNode(TTrieNode *pTN);
 
