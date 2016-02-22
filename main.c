@@ -448,7 +448,7 @@ int main(int argc, char *argv[]) {
 
 
     /*  process options */
-	while ((op = getopt(argc, argv, "i:c:d:F?h")) != -1) {
+	while ((op = getopt(argc, argv, "i:c:d:p:F?h")) != -1) {
 		switch (op) {
 			case 'i' : strncpy(opt.device,optarg, MAX_STRING); break;
 			case 'c' : strncpy(opt.config_file,optarg, MAX_STRING); break;
@@ -513,6 +513,8 @@ int main(int argc, char *argv[]) {
 
     
     signal(SIGINT, &terminates);
+    signal(SIGKILL, &terminates);
+    signal(SIGTERM, &terminates);
     signal(SIGUSR1, &sig_usr1);
     signal(SIGALRM, &sig_alrm);
     signal(SIGHUP, &sig_hup);

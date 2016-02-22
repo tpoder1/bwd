@@ -62,7 +62,7 @@ void help() {
     msg(MSG_INFO, "Usage: bwd [-i <interface>] [ -c <config_file> ] [ -d <debug_level> ] [ -p <pidfile> ] [ -F ] ");
     msg(MSG_INFO, ""); 
     msg(MSG_INFO, "-c config file (default: /etc/bwd/bwd.conf)"); 
-    msg(MSG_INFO, "-p pid file (default: /var/rin.bwd.pid)"); 
+    msg(MSG_INFO, "-p pid file (default: /var/run/bwd.pid)"); 
     msg(MSG_INFO, "-F run in foreground"); 
     msg(MSG_INFO, ""); 
     exit(0);
