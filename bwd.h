@@ -95,12 +95,18 @@ typedef enum action_s {
 	ACTION_DEL
 } action_t;
 
+typedef enum config_s {
+	CONFIG_CF,
+	CONFIG_OP,
+} config_t;
+
 
 
 int parse_config(options_t *opt);
-stat_node_t * stat_node_new(options_t *opt);
+stat_node_t * stat_node_new(options_t *opt, config_t ct);
 int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int prefixlen, stat_node_t *stat_node);
 void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_node);
+
 
 int exec_node_cmd(options_t *opt, stat_node_t *stat_node, action_t action);
 

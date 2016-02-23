@@ -1532,7 +1532,7 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 115 "config.y"
-    { (yyval.stat_node) = stat_node_new(opt); if ((yyval.stat_node) == NULL) { YYABORT; }; ;}
+    { (yyval.stat_node) = stat_node_new(opt, CONFIG_CF); if ((yyval.stat_node) == NULL) { YYABORT; }; ;}
     break;
 
   case 20:

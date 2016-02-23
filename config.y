@@ -112,7 +112,7 @@ rules: /* empty */
 	| rules rule;
 
 rule: 
-	RULETOK OBRACE { $<stat_node>$ = stat_node_new(opt); if ($<stat_node>$ == NULL) { YYABORT; }; } ruleparams EBRACE	{ ;  } 
+	RULETOK OBRACE { $<stat_node>$ = stat_node_new(opt, CONFIG_CF); if ($<stat_node>$ == NULL) { YYABORT; }; } ruleparams EBRACE	{ ;  } 
 	;
 
 ruleparams: /* empty */ 

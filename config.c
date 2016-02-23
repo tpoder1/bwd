@@ -188,7 +188,7 @@ int parse_config(options_t *opt) {
 	}
 }
 
-stat_node_t * stat_node_new(options_t *opt) {
+stat_node_t * stat_node_new(options_t *opt, config_t ct) {
 	stat_node_t *tmp;
 
 	tmp = malloc(sizeof(stat_node_t));
@@ -203,8 +203,13 @@ stat_node_t * stat_node_new(options_t *opt) {
 	tmp->remove_delay = opt->remove_delay;
 	tmp->treshold = opt->treshold;
 
-	tmp->next_node = opt->cf_root_node;
-	opt->cf_root_node = tmp;
+	if (ct == CONFIG_OP) {
+		tmp->next_node = opt->op_root_node;
+		opt->op_root_node = tmp;
+	} else {
+		tmp->next_node = opt->cf_root_node;
+		opt->cf_root_node = tmp;
+	}
 
 	return tmp;
 }

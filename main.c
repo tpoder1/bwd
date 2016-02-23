@@ -286,11 +286,11 @@ void eval_packet(options_t *opt, int af, int flow_dir, char* addr, int bytes, in
 		if (stat_node->dynamic_ipv4 != 0) {
 
 			/* add dynamic rule */
-			new_node = stat_node_new(opt); 
+			new_node = stat_node_new(opt, CONFIG_OP); 
 
 			if (new_node != NULL) {
 
-				/* copy content of the parent node except next_node pounter (assigned by stat_node_new */
+				/* copy content of the parent node except next_node pounter (assigned by stat_node_new) */
 				tmp = new_node->next_node;
 				memcpy(new_node, stat_node, sizeof(stat_node_t));
 				new_node->next_node = tmp;
