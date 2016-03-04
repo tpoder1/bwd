@@ -14,9 +14,9 @@ ID="$2"
 if [ "$ACTION" == "new" ]; then
 
 	#test root rule 
-	if [ "$(tc qdisc show dev $DEV | grep $QDISC)" == "" ]; then 
-		tc qdisc add dev $DEV root handle 1:0 $QDISC
-	fi
+#	if [ "$(tc qdisc show dev $DEV | grep $QDISC)" == "" ]; then 
+#		tc qdisc add dev $DEV root handle 1:0 $QDISC
+#	fi
 
 	# shaping rule 
 	while read line ; do

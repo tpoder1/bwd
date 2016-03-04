@@ -46,6 +46,7 @@ typedef struct stat_node_s {
 	int id;					/* assigned unique id */
 
 	struct stat_node_s  *next_node;
+	pthread_mutex_t lock;
 
 } stat_node_t;
 
@@ -54,8 +55,10 @@ typedef struct stat_node_s {
 typedef struct options_s {
 
 	int debug;						/* debug mode */
+	int debug_fromarg;				/* debug mode set on command line */
 	int foreground;					/* do not daemonize */
-	char device[MAX_STRING]; 	/* interface name */
+	char device[MAX_STRING]; 		/* interface name */
+	int  device_fromarg; 			/* interface name from command line */
 	double treshold;   				/* treshold (0.78 = 78%) */
 	int window_size; 	 			/* window size to evaluate (in seconds) */
 	int remove_delay;				/* delay before shaping rule is removed */
@@ -63,13 +66,25 @@ typedef struct options_s {
 	int last_expire_check;			/* timestam of last expire check */
 	char config_file[MAX_STRING];	/* config gile name */
 	char dbdump_file[MAX_STRING];	/* status file for database dump */
-	char pid_file[MAX_STRING];		/* filw with PID */
+	char statistic_file[MAX_STRING];	/* file with internal statistics */
+	char pid_file[MAX_STRING];		/* file with PID */
+	int pid_file_fromarg;			/* pid file set on command line  */
 	char exec_new[MAX_STRING];		/* command to exec new rule */
 	char exec_del[MAX_STRING];		/* command to exec to remove rule */
+	char exec_init[MAX_STRING];		/* command to exec at the initalisation*/
+	char exec_finish[MAX_STRING];	/* command to exec at the termination */
 	int	id_num;						/* number of numbers in id pool  */
 	int	id_last;					/* last assigned id (without offset) */
 	int	id_offset;					/* ide offset (100 = star with id 100) */
 
+	int statistic_interval;			/* interval how often update statistics file */
+	int statistic_last;				/* last update of statistic file */
+	int statistic_rules;
+	int statistic_active;
+	int statistic_dynamic;
+	uint64_t statistic_bytes; 
+	uint64_t statistic_pkts; 
+	
 //	hash_table_t hash_table;
 #define FLOW_DIR_SRC 	0
 #define FLOW_DIR_DST 	1
@@ -84,6 +99,10 @@ typedef struct options_s {
 	TTrieNode *cf_trie6[2];
 	stat_node_t *cf_root_node;
 
+	pthread_mutex_t trie_mutex;
+	pthread_mutex_t config_mutex;
+	pthread_mutex_t statistic_mutex;
+
 	/* bit array of allocated ids */
 	bit_array_t ids;
 
@@ -92,7 +111,9 @@ typedef struct options_s {
 typedef enum action_s {
 	ACTION_DUMP,
 	ACTION_NEW,
-	ACTION_DEL
+	ACTION_DEL,
+	ACTION_INIT,
+	ACTION_FINISH
 } action_t;
 
 typedef enum config_s {
@@ -100,11 +121,17 @@ typedef enum config_s {
 	CONFIG_OP,
 } config_t;
 
+typedef enum cmp_s {
+	CMP_ALL,
+	CMP_NOPREFIX,
+} cmp_t;
+
 
 
 int parse_config(options_t *opt);
 stat_node_t * stat_node_new(options_t *opt, config_t ct);
 int stat_node_add(options_t *opt, int af, int direction, char *ipaddr, long int prefixlen, stat_node_t *stat_node);
+stat_node_t* add_dynamic_node(options_t *opt, stat_node_t *parent_node, int af, char *addr, int flow_dir, config_t config);
 void stat_node_log(FILE *fh, action_t action, options_t *opt, stat_node_t *stat_node);
 
 

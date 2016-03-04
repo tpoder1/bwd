@@ -73,7 +73,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 %token DYNAMICTOK IPV4TOK IPV6TOK BITPSTOK PPSTOK
 %token IFACETOK OPTIONSTOK DBDUMPTOK DEBUGTOK FILETOK
 %token LEVELTOK COMMANDTOK NEWTOK DELTOK TRESHOLDTOK 
-%token WINDOWTOK SIZETOK EXPIRETOK DELAYTOK IDTOK OFFSETTOK
+%token WINDOWTOK SIZETOK EXPIRETOK DELAYTOK IDTOK OFFSETTOK PIDTOK STATISTICTOK
 %token <number> NUMBER FACTOR
 %token <ipv4> IPV4ADDR 
 %token <ipv6> IPV6ADDR
@@ -96,9 +96,12 @@ optionparams: /* empty */
 	;
 
 option:
-	| IFACETOK STRING 				{ strncpy(opt->device, $2, MAX_STRING); }
-	| DEBUGTOK LEVELTOK NUMBER 		{ opt->debug = $3; }
+	| IFACETOK STRING 				{ if (!opt->device_fromarg) strncpy(opt->device, $2, MAX_STRING); }
+	| DEBUGTOK LEVELTOK NUMBER 		{ if (!opt->debug_fromarg) opt->debug = $3; }
 	| DBDUMPTOK FILETOK STRING 		{ strncpy(opt->dbdump_file, $3, MAX_STRING); }
+	| STATISTICTOK FILETOK STRING 		{ strncpy(opt->statistic_file, $3, MAX_STRING); }
+	| STATISTICTOK DELAYTOK NUMBER 	{ opt->statistic_interval = $3; }
+	| PIDTOK FILETOK STRING 		{ if (!opt->pid_file_fromarg) strncpy(opt->pid_file, $3, MAX_STRING); }
 	| NEWTOK COMMANDTOK STRING 		{ strncpy(opt->exec_new, $3, MAX_STRING); }
 	| DELTOK COMMANDTOK STRING 		{ strncpy(opt->exec_del, $3, MAX_STRING); }
 	| TRESHOLDTOK NUMBER 			{ opt->treshold = $2; }

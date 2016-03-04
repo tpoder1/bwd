@@ -57,13 +57,13 @@ void msg(int type, char* msg, ...) {
 void help() {
     msg(MSG_INFO, "Welcome bandwidth daemon %s", LOG_VERSION);
     msg(MSG_INFO, "Comment please send to <tpoder@cis.vutbr.cz>");
-    msg(MSG_INFO, "Project homepage: http://github.com/tpoder1/bwd");
     msg(MSG_INFO, "");
     msg(MSG_INFO, "Usage: bwd [-i <interface>] [ -c <config_file> ] [ -d <debug_level> ] [ -p <pidfile> ] [ -F ] ");
     msg(MSG_INFO, ""); 
     msg(MSG_INFO, "-c config file (default: /etc/bwd/bwd.conf)"); 
     msg(MSG_INFO, "-p pid file (default: /var/run/bwd.pid)"); 
     msg(MSG_INFO, "-F run in foreground"); 
+    msg(MSG_INFO, "-i interface name to listen on"); 
     msg(MSG_INFO, ""); 
     exit(0);
 }

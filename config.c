@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <pthread.h>
 #include <syslog.h>
 #include "msgs.h"
 #include "bwd.h"
@@ -32,19 +33,22 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 
 
 /* compare items of two nodes */
-int stats_node_cmp(stat_node_t *n1, stat_node_t *n2) {
+int stats_node_cmp(stat_node_t *n1, stat_node_t *n2, cmp_t cmp_mode) {
 
-	if (n1->num_prefixes != n2->num_prefixes) { return 1; }
 	if (n1->limit_bps != n2->limit_bps) { return 1; }
 	if (n1->limit_pps != n2->limit_pps) { return 1; }
 	if (n1->treshold != n2->treshold) { return 1; }
 	if (n1->window_size != n2->window_size) { return 1; }
 	if (n1->remove_delay != n2->remove_delay) { return 1; }
-	if (n1->dynamic_ipv4 != n2->dynamic_ipv4) { return 1; }
-	if (n1->dynamic_ipv6 != n2->dynamic_ipv6) { return 1; }
+//	if (n1->dynamic_ipv4 != n2->dynamic_ipv4) { return 1; }
+//	if (n1->dynamic_ipv6 != n2->dynamic_ipv6) { return 1; }
 
-	return memcmp(n1->prefixes, n2->prefixes, sizeof(n2->prefixes));
+	if (cmp_mode == CMP_NOPREFIX) {
+		if (n1->num_prefixes != n2->num_prefixes) { return 1; }
+		return memcmp(n1->prefixes, n2->prefixes, sizeof(n2->prefixes));
+	}
 
+	return 0;
 }
 
 
@@ -54,7 +58,7 @@ int stats_node_cmp(stat_node_t *n1, stat_node_t *n2) {
 */
 int update_config(options_t *opt) {
 
-	stat_node_t *stat_node, *new_stat_node;
+	stat_node_t *stat_node, *new_stat_node, *new_node_dynamic;
 	TTrieNode *pTn, *trie;
 	ip_prefix_t *ppref;
 	int addrlen;
@@ -97,7 +101,8 @@ int update_config(options_t *opt) {
 					new_stat_node = pTn->Value;
 
 					/* compare the content of the old and the new node */
-					if (stats_node_cmp(stat_node, new_stat_node) == 0) {
+					if (stats_node_cmp(stat_node, new_stat_node, CMP_ALL) == 0) {
+							
 						/* new node have same configuration - just copy some data from the old one */
 						new_stat_node->stats_bytes = stat_node->stats_bytes;
 						new_stat_node->stats_pkts = stat_node->stats_pkts;
@@ -105,15 +110,32 @@ int update_config(options_t *opt) {
 						new_stat_node->window_reset = stat_node->window_reset;
 						new_stat_node->time_reported = stat_node->time_reported;
 						new_stat_node->id = stat_node->id;
+
 					} else {
-						/* differend configuration - remove the existing rule */
-						exec_node_cmd(opt, stat_node, ACTION_DEL);
+						/* differend configuration - check dynamic rule or remove the existing rule */
+
+						/* with dynamic node we just add it into current trie */
+						if ( (stats_node_cmp(stat_node, new_stat_node, CMP_NOPREFIX) == 0) && 
+							(new_stat_node->dynamic_ipv4 || new_stat_node->dynamic_ipv6) ) {
+
+							/* copy dynamic rule */
+							new_node_dynamic = add_dynamic_node(opt, new_stat_node, ppref->af, addr, ppref->flow_dir, CONFIG_CF);
+							if (new_node_dynamic != NULL) {
+								new_node_dynamic->stats_bytes = stat_node->stats_bytes;
+								new_node_dynamic->stats_pkts = stat_node->stats_pkts;
+								new_node_dynamic->last_updated = stat_node->last_updated;
+								new_node_dynamic->window_reset = stat_node->window_reset;
+								new_node_dynamic->time_reported = stat_node->time_reported;
+								new_node_dynamic->id = stat_node->id;
+							}
+						} else {
+							exec_node_cmd(opt, stat_node, ACTION_DEL);
+						}
 					}
 				}
 
-
 			} else {
-				/* therw were no prefixes defined so the rule might not exist, just for sure remove rule */
+				/* there were no prefixes defined so the rule not exists in new configuration, just for sure remove rule */
 				exec_node_cmd(opt, stat_node, ACTION_DEL);
 			}
 
@@ -134,6 +156,7 @@ int parse_config(options_t *opt) {
 //	YY_BUFFER_STATE buf;
 	int parse_ret;
 	FILE * fp;
+	int rules;
 
 	fp = fopen(opt->config_file, "r");
 
@@ -144,6 +167,11 @@ int parse_config(options_t *opt) {
 
 	yylex_init(&scanner);
 	yyset_in(fp, scanner);
+
+	rules = opt->statistic_rules;
+	opt->statistic_rules = 0;
+
+	pthread_mutex_lock(&opt->config_mutex);
 
     parse_ret = yyparse(scanner, opt);
 //    parse_ret = yyparse(scanner);
@@ -175,17 +203,28 @@ int parse_config(options_t *opt) {
 			opt->cf_trie6[FLOW_DIR_SRC] = NULL;
 			opt->cf_trie6[FLOW_DIR_DST] = NULL;
 			opt->cf_root_node = NULL;
+			pthread_mutex_unlock(&opt->config_mutex);
 			return 1;
 		} else {
+			pthread_mutex_unlock(&opt->config_mutex);
 			return 0;
 		}
 
+		opt->statistic_dynamic = 0;
+		opt->statistic_rules = 0;
+		opt->statistic_active = 0;
+
 	} else {
+
+		opt->statistic_rules = rules;
+		pthread_mutex_unlock(&opt->config_mutex);
 
 		/* keep the old config */
 		msg(MSG_ERROR, "Can't load config file");
 		return 0;
 	}
+
+	pthread_mutex_unlock(&opt->config_mutex);
 }
 
 stat_node_t * stat_node_new(options_t *opt, config_t ct) {
@@ -199,6 +238,10 @@ stat_node_t * stat_node_new(options_t *opt, config_t ct) {
 
 	memset(tmp, 0x0, sizeof(stat_node_t));
 
+	pthread_mutex_lock(&opt->statistic_mutex);
+	opt->statistic_rules++;
+	pthread_mutex_unlock(&opt->statistic_mutex);
+
 	tmp->window_size = opt->window_size;
 	tmp->remove_delay = opt->remove_delay;
 	tmp->treshold = opt->treshold;
@@ -210,6 +253,8 @@ stat_node_t * stat_node_new(options_t *opt, config_t ct) {
 		tmp->next_node = opt->cf_root_node;
 		opt->cf_root_node = tmp;
 	}
+
+	pthread_mutex_init(&tmp->lock, NULL);
 
 	return tmp;
 }

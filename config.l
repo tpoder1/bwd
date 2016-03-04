@@ -46,10 +46,12 @@
 options			return OPTIONSTOK; 
 interface		return IFACETOK; 
 dbdump			return DBDUMPTOK; 
+pid				return PIDTOK; 
 file			return FILETOK; 
 debug			return DEBUGTOK; 
 level			return LEVELTOK; 
 command			return COMMANDTOK; 
+statistic		return STATISTICTOK; 
 new				return NEWTOK; 
 del				return DELTOK; 
 treshold		return TRESHOLDTOK; 
