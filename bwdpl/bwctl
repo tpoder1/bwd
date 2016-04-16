@@ -1,0 +1,242 @@
+#!/usr/bin/perl -w
+use strict;
+
+use Getopt::Std;
+use Data::Dumper;
+use POSIX qw(strftime);
+use DBI;
+use File::Basename;
+
+my $METASTR	= "#\@shaper";
+my $DATAFILE = "/tmp/db";
+my $DEBUG = 0;
+
+
+my %OPTS;		# Options from command line
+my $DBH;
+
+
+sub db_connect() {
+
+	$DBH = DBI->connect("dbi:SQLite:dbname=$DATAFILE");
+
+	if (!$DBH) {
+		printf("Can't open to datafile %s (%s).\n", $DATAFILE,  $DBI::errstr);
+		return 0;
+	}
+
+	return 1;
+}
+
+
+# initialise empty database file 
+sub db_init {
+	my ($datafile, @cols) = @_;
+
+
+	my $sql = "
+			CREATE TABLE IF NOT EXISTS ipaddr (
+			ipaddr		CHAR(90) NOT NULL PRIMARY KEY,
+			grp 		CHAR(100) NOT NULL,
+			download	int NOT NULL,
+			upload		int NOT NULL,
+			to_delete	int NOT NULL)
+			";
+
+	$DBH->do('BEGIN TRANSACTION');
+
+	if (!$DBH->do($sql)) {
+		printf("Can't create emty database.\n", $DATAFILE,  $DBI::errstr);
+		return 0;
+	}
+
+	if (!$DBH->do("UPDATE ipaddr SET to_delete = 1")) {
+		printf("Can't set to_delete\n", $DATAFILE,  $DBI::errstr);
+		return 0;
+	}
+
+	return 1;
+}
+
+sub db_rule($$$$) {
+	my ($ip, $group, $down, $up) = @_;
+
+	my $rows;	
+
+	if (!defined($group)) {
+		$group = "";
+		$group .= sprintf("%x", rand 16) for 1..18;
+	}
+
+	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, to_delete) 
+				VALUES (?, ?, ?, ?, 0)";
+	
+	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up)) ) {
+		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
+		return 0;
+	}
+
+	if ($rows > 0 ){
+		printf("New record %s %d %d\n", $ip, $down, $up);
+		return 1;
+	}
+
+	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, to_delete = 0 
+			WHERE ipaddr = ? and (download != ? or upload != ?)";
+
+	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $ip, $down, $up)) ) {
+		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
+		return 0;
+	}
+
+	if ($rows > 0 ){
+		printf("Updated record %s %d %d\n", $ip, $down, $up);
+		return 1;
+	}
+
+	$sql = "UPDATE ipaddr SET to_delete = 0 WHERE ipaddr = ?";
+	if (! ($rows = $DBH->do($sql, undef, $ip)) ) {
+		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
+		return 0;
+	}
+
+
+	return 1;
+	
+}
+
+sub db_dump() {
+
+	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload FROM ipaddr");
+
+	if (!$tbh->execute()) {	
+		printf("Can't dumb database.\n", $DBI::errstr);
+		return 0;
+	}
+
+	printf("%-20s -> %5s %5s\n", "IP ADDR", "UP", "DOWN");
+	while (my ($ip, $up, $down) = $tbh->fetchrow_array()) {
+
+		printf("%-20s -> %5d %5d\n", $ip, $up, $down);
+
+	}
+}
+
+sub db_finish {
+
+	my $rows;
+
+	if (!($rows = $DBH->do("DELETE FROM ipaddr WHERE to_delete = 1"))) {
+		printf("Can't delete old records\n", $DATAFILE,  $DBI::errstr);
+		return 0;
+	}
+
+	if ($rows > 0 ){
+		printf("Removed %d record(s).\n", $rows);
+	}
+
+	$DBH->commit;
+	return 1;
+}
+
+sub parse_config($) {
+	my ($config) = @_;
+
+	my $lineno = 0;
+	my %defines;
+
+	open F1, "< $config";
+
+	while (<F1>) {
+		$lineno++;
+		chomp;
+
+		my ($com, $atts) = split(/$METASTR/, $_);
+		# skip lines without metatag
+		next if (!defined($atts) || $atts eq "");
+
+#		printf("ATTS: '%s'\n", $atts);
+
+		$atts =~ s/^\s+//;
+		my ($cmd, @arg) = split(/[\s,=]+/, $atts);
+
+		if ($cmd eq "define") {
+
+#			printf("def '%s' -> '%s'\n", $arg[0], $arg[1]);
+			$defines{$arg[0]} = $arg[1];
+
+		} elsif ($cmd eq "rule") {
+	
+			my %atts;
+#			printf("Rule: %s\n", join(" : ", @arg));
+
+			for (my $x = 0; $x < @arg - 1; $x++, $x++ ) {
+				my $key = $arg[$x];
+				my $val = $arg[$x+1];
+
+				if ( defined($defines{$val}) ) { $val = $defines{$val}; }
+				
+				$atts{$key} = $val;
+#				printf("%s -> %s\n", $key, $val);
+			}
+
+			# check attributes 
+			if (!defined($atts{'download'})  || !defined($atts{'upload'})) {
+				printf("Missing upload/download attribute on line %d.\n", $lineno);
+				return 0;
+			}
+			if ($atts{'download'} !~ /^\d+$/ || $atts{'upload'} !~ /^\d+$/) {
+				printf("Invalid upload/download attribute on line %d.\n", $lineno);
+				return 0;
+			}
+			if (!defined($atts{'ip'})) {
+				printf("Missing ip attribute on line %d.\n", $lineno);
+				return 0;
+			}
+			
+			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'}, $atts{'upload'}); 
+
+			if (!$ret) {
+				return 0;
+			}
+
+		} else {
+			printf("Unknown command %s on line %d\n", $cmd, $lineno);
+			return 0;
+		}
+
+	}
+
+	close F1;
+
+	return 1;
+}
+
+# help
+sub usage() {
+	printf "config sync control\n";
+	printf "Usage:\n";
+	printf "    %s -d <debug_level> -u <username> -q <queue process time>\n", $0;
+	exit 1;
+}
+
+if (!getopt("d:u:q:", \%OPTS) || defined($OPTS{"?"})) {
+	usage();	
+	exit 1;
+}
+
+if (defined($OPTS{"d"})) {
+	$DEBUG = $OPTS{"d"};
+}
+
+db_connect() || die "Exiting...";
+db_init() || die "Exiting...";
+
+if (!parse_config("traffic.cfg")) {
+	printf "Configuration not updated!\n";
+}
+
+db_finish() || die "Exiting...";
+
+#db_dump();
+

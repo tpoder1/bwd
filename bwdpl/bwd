@@ -1,0 +1,307 @@
+#!/usr/bin/perl  
+
+#my $CONFIG		= "bwd.conf";	# config file
+my $CONFIG		= "/root/work/bwd/bwdpl/bwd.conf";	# config file
+my $LOGNAME		= substr($0, rindex($0, "/") + 1);;
+my $LOGFACILITY	= "daemon.info";
+my $DEBUG 		= 1;
+
+use DBI;
+use Data::Dumper;
+use Getopt::Std;
+use POSIX;
+use Sys::Syslog qw(:DEFAULT setlogsock);
+use strict;
+
+my $DBH;		# database handler
+my %RULEDB;		# rule database
+our %BWD_CONF;	# content of configuration file 
+my %ID;			# allocated IDs
+my %OPTS;		# options
+my $TERMNATE = 0;
+
+
+
+
+#
+#open F1, ">> /tmp/log";
+#printf F1 "%s\n", join(":", @ARGV);
+#close F1;
+
+# logging rutine
+sub mylog {
+	my ($msg, @par) = @_;
+	my $lmsg = sprintf($msg, @par);
+	if ($DEBUG > 0) {
+		printf "%s[%d]: %s\n", strftime("%Y-%m-%d.%H:%M:%S", localtime), $$, $lmsg;
+	}
+	setlogsock('unix');
+	openlog("$LOGNAME\[$$\]", 'ndelay', 'user');
+	syslog($LOGFACILITY, $lmsg);
+}
+
+
+# connect or reconnect database 
+sub db_connect() {
+
+	if ( defined($BWD_CONF{'database'}) ) {
+
+		my($driver, $server, $db, $user, $password) = split(/;/, $BWD_CONF{'database'});
+		my $dsn;
+
+		if ($driver eq "mysql") {
+			$dsn = "DBI:mysql:$db:$server";
+		} elsif ($driver eq "pgsql") {
+			$dsn = "DBI:Pg:dbname=$db;host=$server";
+		} elsif ($driver eq "sqlite") {
+			$dsn = "dbi:SQLite:dbname=$db";
+		}
+
+		mylog("Connecting DB: %s,%s,*password*", $dsn, $user) if ($DEBUG > 0); 
+
+		if (!($DBH = DBI->connect($dsn, $user, $password, {'PrintError'=>0}))) {
+
+			mylog("Can't connect to SQL server: %s.", $DBI::err);
+			return 0;
+
+		}  else {
+
+			return 1;
+
+		}
+
+	} else {
+
+		mylog("Database connection string not defined.");
+		return 0;
+
+	}
+}
+
+sub rec_cmp($$) {
+	my ($r1, $r2) = @_;
+
+
+	return 1 if ($r1->{DOWNLOAD} != $r2->{DOWNLOAD});
+	return 1 if ($r1->{UPLOAD} != $r2->{UPLOAD});
+	return 1 if (@{$r1->{IP}} != @{$r2->{IP}});
+	foreach (@{$r1->{IP}}) {
+		return 1 if ($r1->{IP}->[$_] ne $r2->{IP}->[$_]);
+	}
+
+	return 0;
+}
+
+# perform action (execute command)
+sub action_cmd($$) {
+
+	my ($action, $rec) = @_;
+
+	if (!defined($BWD_CONF{'callbacks'}->{$action})) {
+
+		mylog("No callback defined for action %s", $action);
+		return 0;
+
+	}
+
+	my $callback = $BWD_CONF{'callbacks'}->{$action};
+
+	if ( ! -x $callback ) {
+		mylog("Script %s not foud or can't be executed", $callback);
+		return 0;
+	}
+
+	my $cmd = sprintf("%s %s ", $callback, $action);
+	if (defined($rec)) {
+		$cmd .= rec_str($rec);
+	}
+
+	system($cmd);
+
+	if ($? == -1) {
+		mylog("Can't execute command: %s", $cmd);
+		return 0;
+	} 
+
+	return 1;
+}
+
+
+# gent next free ID
+sub get_id() {
+
+	my $id = $BWD_CONF{'first_id'};
+
+	while (defined($ID{$id})) {
+		$id++;	
+	}	
+	
+	$ID{$id} = 1;	
+	return $id;
+}
+
+sub free_id($) {
+	my ($id) = @_;
+
+	delete($ID{$id});	
+
+}
+
+
+sub rec_str($) {
+	my ($rec) = @_;
+
+	return sprintf("%x %x %d %d %s", $rec->{DOWNLOAD_ID}, $rec->{UPLOAD_ID}, $rec->{DOWNLOAD}, $rec->{UPLOAD}, join(" ", @{$rec->{IP}}));
+	
+}
+
+# reload data structure in DB 
+sub db_reload() {
+
+	my $tbh;
+	my %db;
+
+
+	my $query = $BWD_CONF{'scan_query'};
+
+	if (! ($tbh = $DBH->prepare($query)) ) {
+		mylog("Can't prepare query \'%s\', %s.\n", $query, $DBI::errstr);
+		return 0;
+
+	}
+
+	if (!$tbh->execute()) {
+		mylog("Can't execute query \'%s\', %s.\n", $query, $DBI::errstr);
+		return 0;
+	}
+
+    while (my ($grp, $ip, $down, $up) = $tbh->fetchrow_array()) {
+		$db{$grp}->{DOWNLOAD} = $down;
+		$db{$grp}->{UPLOAD} = $up;
+		push(@{$db{$grp}->{IP}}, $ip);
+    }
+
+	# find deleted or changed records 
+	foreach (keys %RULEDB) {
+		if ( ! defined($db{$_}) ) {
+
+			mylog("Deleted record: %s", rec_str( \%{$RULEDB{$_}} ));
+			action_cmd("del", \%{$RULEDB{$_}});
+
+			free_id($RULEDB{$_}->{DOWNLOAD_ID});
+			free_id($RULEDB{$_}->{UPLOAD_ID});
+			delete($RULEDB{$_});
+		} else {
+			# check modified records 
+			if (rec_cmp(\%{$db{$_}}, \%{$RULEDB{$_}})) {
+
+				$db{$_}->{DOWNLOAD_ID} = $RULEDB{$_}->{DOWNLOAD_ID};
+				$db{$_}->{UPLOAD_ID} = $RULEDB{$_}->{UPLOAD_ID};
+
+				mylog("Modified record: %s", rec_str( \%{$RULEDB{$_}} ));
+				action_cmd("upd", \%{$db{$_}});
+
+				($RULEDB{$_}) = ($db{$_});
+				##### CMD
+			}
+			delete($db{$_});
+		}
+		
+	}
+
+	# fiind new modified records 
+	foreach (keys %db) { 
+		$db{$_}->{DOWNLOAD_ID} = get_id();
+		$db{$_}->{UPLOAD_ID} = get_id();
+		mylog("Added record: %s", rec_str( \%{$db{$_}} ));
+		action_cmd("add", \%{$db{$_}} );
+		##### CMD
+		($RULEDB{$_}) = ($db{$_});
+		delete($db{$_});
+	}
+
+}
+
+sub daemonize() {
+	fork and exit;
+	POSIX::setsid();
+	fork and exit;
+	umask 0;
+#	chdir '/tmp';
+	open STDIN , '<', '/dev/null';
+	open STDOUT, '>', '/dev/null';
+	open STDERR, '>', '/dev/null';
+}
+
+sub terminate() {
+
+	mylog("Terminating proccess and cleaning up");
+	action_cmd("fin", undef);
+	mylog("Tterminated");
+	exit(0);
+}
+
+
+# help
+sub usage() {
+	printf "bandwidth shaping daemon\n";
+	printf "Usage:\n";
+	printf "    %s -d <debug_level> -c <config_file> -F\n", $0;
+	printf " -d <debug_level> : default 0 \n";
+	printf " -c <config_file> : default /etc/bwd/bwd.conf \n";
+	printf " -F do not run process to backgroud \n";
+	exit 1;
+}
+
+
+
+if (!getopts("d:c:F?", \%OPTS) || defined($OPTS{"?"})) {
+    usage();
+    exit 1;
+}
+
+if (defined($OPTS{"d"})) {
+	$DEBUG = $OPTS{"d"};
+}
+
+if (! (defined($OPTS{"F"}) && $OPTS{"F"}) ) {
+	printf("DAEMON\n");
+	daemonize();
+#	$SIG{'CHLD'} = sub { wait(); };
+}
+
+if (defined($OPTS{"c"})) {
+	$CONFIG = $OPTS{"c"};
+}
+
+
+$SIG{'INT'} = sub { terminate(); };
+$SIG{'QUIT'} = sub { terminate(); };;
+$SIG{'TERM'} = sub { terminate(); };;
+$SIG{'KILL'} = sub { terminate(); };;
+#$SIG{'KILL'} = &terminate;
+
+
+require  "$CONFIG";
+
+mylog("Starting");
+if (!action_cmd("ini", undef)) {
+	mylog("Exiting...");
+	exit(1);
+}
+
+
+
+while (1) { 
+
+	# reconenct DB if it is nescessary 
+	if (!defined($DBH) || !$DBH->ping) { 
+		db_connect();
+	}
+
+	action_cmd("chk", undef);
+	db_reload();
+	sleep($BWD_CONF{'scan_time'});
+
+}
+
