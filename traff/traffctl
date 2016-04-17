@@ -37,9 +37,10 @@ sub db_init {
 	my $sql = "
 			CREATE TABLE IF NOT EXISTS ipaddr (
 			ipaddr		CHAR(90) NOT NULL PRIMARY KEY,
-			grp 		CHAR(100) NOT NULL,
+			grp 		CHAR(100),
 			download	int NOT NULL,
 			upload		int NOT NULL,
+			mark		int ,
 			to_delete	int NOT NULL)
 			";
 
@@ -58,39 +59,40 @@ sub db_init {
 	return 1;
 }
 
-sub db_rule($$$$) {
-	my ($ip, $group, $down, $up) = @_;
+sub db_rule($$$$$) {
+	my ($ip, $group, $down, $up, $mark) = @_;
 
 	my $rows;	
 
-	if (!defined($group)) {
-		$group = "";
-		$group .= sprintf("%x", rand 16) for 1..18;
-	}
+#	if (!defined($group)) {
+#		$group = "";
+#		$group .= sprintf("%x", rand 16) for 1..18;
+#	}
+#	
 
-	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, to_delete) 
-				VALUES (?, ?, ?, ?, 0)";
+	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, mark, to_delete) 
+				VALUES (?, ?, ?, ?, ?, 0)";
 	
-	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up)) ) {
+	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up, $mark)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
 
 	if ($rows > 0 ){
-		printf("New record %s %d %d\n", $ip, $down, $up);
+		printf("New record %s %d %d [%d]\n", $ip, $down, $up,$mark);
 		return 1;
 	}
 
-	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, to_delete = 0 
-			WHERE ipaddr = ? and (download != ? or upload != ?)";
+	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, mark = ?, to_delete = 0 
+			WHERE ipaddr = ? and (download != ? or upload != ? or grp != ? or mark != ?)";
 
-	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $ip, $down, $up)) ) {
+	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $mark, $ip, $down, $up, $group, $mark)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
 
 	if ($rows > 0 ){
-		printf("Updated record %s %d %d\n", $ip, $down, $up);
+		printf("Updated record %s %d %d [%d]\n", $ip, $down, $up, $mark);
 		return 1;
 	}
 
@@ -107,17 +109,17 @@ sub db_rule($$$$) {
 
 sub db_dump() {
 
-	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload FROM ipaddr");
+	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload, grp, mark FROM ipaddr");
 
 	if (!$tbh->execute()) {	
 		printf("Can't dumb database.\n", $DBI::errstr);
 		return 0;
 	}
 
-	printf("%-20s -> %5s %5s\n", "IP ADDR", "UP", "DOWN");
-	while (my ($ip, $up, $down) = $tbh->fetchrow_array()) {
+	printf("%-25s -> %5s %5s %-18s %s\n", "IP ADDR", "UP", "DOWN", "GROUP", "MARK");
+	while (my ($ip, $up, $down, $group, $mark) = $tbh->fetchrow_array()) {
 
-		printf("%-20s -> %5d %5d\n", $ip, $up, $down);
+		printf("%-25s -> %5d %5d %-18s [%d]\n", $ip, $up, $down, defined($group) ? $group : $ip, $mark);
 
 	}
 }
@@ -168,6 +170,8 @@ sub parse_config($) {
 		} elsif ($cmd eq "rule") {
 	
 			my %atts;
+			$atts{'mark'} = 0;
+			$atts{'group'} = undef;
 #			printf("Rule: %s\n", join(" : ", @arg));
 
 			for (my $x = 0; $x < @arg - 1; $x++, $x++ ) {
@@ -193,8 +197,12 @@ sub parse_config($) {
 				printf("Missing ip attribute on line %d.\n", $lineno);
 				return 0;
 			}
+			if ($atts{'mark'} !~ /^\d+$/) {
+				printf("Invalid mark attribute on line %d (must be number).\n", $lineno);
+				return 0;
+			}
 			
-			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'}, $atts{'upload'}); 
+			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'}, $atts{'upload'}, $atts{'mark'}); 
 
 			if (!$ret) {
 				return 0;
@@ -216,11 +224,12 @@ sub parse_config($) {
 sub usage() {
 	printf "config sync control\n";
 	printf "Usage:\n";
-	printf "    %s -d <debug_level> -u <username> -q <queue process time>\n", $0;
+	printf "    %s [ -d <debug_level> ] [ -l ] \n\n", $0;
+	printf " -l : list current database \n";
 	exit 1;
 }
 
-if (!getopt("d:u:q:", \%OPTS) || defined($OPTS{"?"})) {
+if (!getopts("d:l", \%OPTS) || defined($OPTS{"?"})) {
 	usage();	
 	exit 1;
 }
@@ -232,11 +241,16 @@ if (defined($OPTS{"d"})) {
 db_connect() || die "Exiting...";
 db_init() || die "Exiting...";
 
-if (!parse_config("traffic.cfg")) {
-	printf "Configuration not updated!\n";
+if (defined($OPTS{"l"})) {
+	db_dump();
+} else {
+	if (!parse_config("traffic.cfg")) {
+	
+		printf "Configuration not updated!\n";
+	}
+	db_finish() || die "Exiting...";
 }
 
-db_finish() || die "Exiting...";
 
 #db_dump();
 

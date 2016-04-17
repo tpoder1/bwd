@@ -1,7 +1,7 @@
 #!/usr/bin/perl  
 
 #my $CONFIG		= "bwd.conf";	# config file
-my $CONFIG		= "/root/work/bwd/bwdpl/bwd.conf";	# config file
+my $CONFIG		= "/root/work/bwd/traff/traff.conf";	# config file
 my $LOGNAME		= substr($0, rindex($0, "/") + 1);;
 my $LOGFACILITY	= "daemon.info";
 my $DEBUG 		= 1;
@@ -151,7 +151,9 @@ sub free_id($) {
 sub rec_str($) {
 	my ($rec) = @_;
 
-	return sprintf("%x %x %d %d %s", $rec->{DOWNLOAD_ID}, $rec->{UPLOAD_ID}, $rec->{DOWNLOAD}, $rec->{UPLOAD}, join(" ", @{$rec->{IP}}));
+	return sprintf("%x %x %d %d %x %s", $rec->{DOWNLOAD_ID}, $rec->{UPLOAD_ID}, 
+									$rec->{DOWNLOAD}, $rec->{UPLOAD}, 
+									$rec->{MARK}, join(" ", @{$rec->{IP}}));
 	
 }
 
@@ -175,9 +177,16 @@ sub db_reload() {
 		return 0;
 	}
 
-    while (my ($grp, $ip, $down, $up) = $tbh->fetchrow_array()) {
+    while (my ($ip, $grp, $down, $up, $mark) = $tbh->fetchrow_array()) {
+
+		# group is not defined 
+		$grp = $ip if (!defined($grp) || $grp eq '');
+		# mark is not defined 
+		$mark = 0 if (!defined($mark));
+
 		$db{$grp}->{DOWNLOAD} = $down;
 		$db{$grp}->{UPLOAD} = $up;
+		$db{$grp}->{MARK} = $mark;
 		push(@{$db{$grp}->{IP}}, $ip);
     }
 

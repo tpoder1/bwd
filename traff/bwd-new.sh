@@ -14,21 +14,22 @@ IPSET_OPTS="skbinfo counters"
 BURST=8
 
 ACTION="$1" ; shift
-ID_SRC="$1" ; shift
-ID_DST="$1" ; shift
+ID_SRC="$1" ; shift				# returned as hex number
+ID_DST="$1" ; shift				# returned as hex number
 BW_SRC="$1" ; shift
 BW_DST="$1" ; shift
+MARK="0x${1}/0xFFFF" ; shift		# mark returned as HEX number
 ADDR="$@"
 
 add_addrs() {
 	for addr in $@ ; do
 		# ipv6 
 		if [[ $addr =~ [:] ]]; then
-			$IPSET add BWD-SRC6 $addr skbprio 1:${ID_SRC}
-			$IPSET add BWD-DST6 $addr skbprio 1:${ID_DST}
+			$IPSET add BWD-SRC6 $addr skbprio 1:${ID_SRC} skbmark ${MARK}
+			$IPSET add BWD-DST6 $addr skbprio 1:${ID_DST} skbmark ${MARK}
 		else 
-			$IPSET add BWD-SRC $addr skbprio 1:${ID_SRC}
-			$IPSET add BWD-DST $addr skbprio 1:${ID_DST}
+			$IPSET add BWD-SRC $addr skbprio 1:${ID_SRC} skbmark ${MARK}
+			$IPSET add BWD-DST $addr skbprio 1:${ID_DST} skbmark ${MARK}
 		fi
 	done
 }
@@ -59,14 +60,14 @@ case "$ACTION" in
 		;;
 
 	"chk") 
-		$IPTABLES  -C $CHAIN -t mangle -j SET --map-set BWD-SRC src --map-prio 2>/dev/null || \
-			$IPTABLES  -A $CHAIN -t mangle -j SET --map-set BWD-SRC src --map-prio 
-		$IPTABLES  -C $CHAIN -t mangle -j SET --map-set BWD-DST dst --map-prio 2>/dev/null || \
-			$IPTABLES  -A $CHAIN -t mangle -j SET --map-set BWD-DST dst --map-prio 
-		$IP6TABLES  -C $CHAIN -t mangle -j SET --map-set BWD-SRC6 src --map-prio 2>/dev/null || \
-			$IP6TABLES  -A $CHAIN -t mangle -j SET --map-set BWD-SRC6 src --map-prio 
-		$IP6TABLES  -C $CHAIN -t mangle -j SET --map-set BWD-DST6 dst --map-prio 2>/dev/null || \
-			$IP6TABLES  -A $CHAIN -t mangle -j SET --map-set BWD-DST6 dst --map-prio 
+		$IPTABLES  -C $CHAIN -t mangle -j SET --map-set BWD-SRC src --map-prio --map-mark 2>/dev/null || \
+			$IPTABLES  -A $CHAIN -t mangle -j SET --map-set BWD-SRC src --map-prio --map-mark 
+		$IPTABLES  -C $CHAIN -t mangle -j SET --map-set BWD-DST dst --map-prio --map-mark 2>/dev/null || \
+			$IPTABLES  -A $CHAIN -t mangle -j SET --map-set BWD-DST dst --map-prio  --map-mark 
+		$IP6TABLES  -C $CHAIN -t mangle -j SET --map-set BWD-SRC6 src --map-prio --map-mark 2>/dev/null || \
+			$IP6TABLES  -A $CHAIN -t mangle -j SET --map-set BWD-SRC6 src --map-prio  --map-mark 
+		$IP6TABLES  -C $CHAIN -t mangle -j SET --map-set BWD-DST6 dst --map-prio --map-mark 2>/dev/null || \
+			$IP6TABLES  -A $CHAIN -t mangle -j SET --map-set BWD-DST6 dst --map-prio --map-mark
 		;;
 
 	"fin") 
