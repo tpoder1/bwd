@@ -8,8 +8,9 @@ use DBI;
 use File::Basename;
 
 my $METASTR	= "#\@shaper";
-my $DATAFILE = "/tmp/db";
+my $DATAFILE = "/etc/traffd/traffic.db";
 my $DEBUG = 0;
+my $MULT = 1000*1000; # baseu units (megabits)
 
 
 my %OPTS;		# Options from command line
@@ -202,7 +203,7 @@ sub parse_config($) {
 				return 0;
 			}
 			
-			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'}, $atts{'upload'}, $atts{'mark'}); 
+			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'} * $MULT , $atts{'upload'} * $MULT, $atts{'mark'}); 
 
 			if (!$ret) {
 				return 0;
