@@ -1,1 +1,0 @@
-bwd-new.sh

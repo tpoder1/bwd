@@ -1,1 +1,0 @@
-bwd-del.sh

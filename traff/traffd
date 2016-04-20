@@ -15,7 +15,7 @@ use strict;
 
 my $DBH;		# database handler
 my %RULEDB;		# rule database
-our %BWD_CONF;	# content of configuration file 
+our %TRAFFD_CONF;	# content of configuration file 
 my %ID;			# allocated IDs
 my %OPTS;		# options
 my $TERMNATE = 0;
@@ -44,9 +44,9 @@ sub mylog {
 # connect or reconnect database 
 sub db_connect() {
 
-	if ( defined($BWD_CONF{'database'}) ) {
+	if ( defined($TRAFFD_CONF{'database'}) ) {
 
-		my($driver, $server, $db, $user, $password) = split(/;/, $BWD_CONF{'database'});
+		my($driver, $server, $db, $user, $password) = split(/;/, $TRAFFD_CONF{'database'});
 		my $dsn;
 
 		if ($driver eq "mysql") {
@@ -97,14 +97,14 @@ sub action_cmd($$) {
 
 	my ($action, $rec) = @_;
 
-	if (!defined($BWD_CONF{'callbacks'}->{$action})) {
+	if (!defined($TRAFFD_CONF{'callbacks'}->{$action})) {
 
 		mylog("No callback defined for action %s", $action);
 		return 0;
 
 	}
 
-	my $callback = $BWD_CONF{'callbacks'}->{$action};
+	my $callback = $TRAFFD_CONF{'callbacks'}->{$action};
 
 	if ( ! -x $callback ) {
 		mylog("Script %s not foud or can't be executed", $callback);
@@ -130,7 +130,7 @@ sub action_cmd($$) {
 # gent next free ID
 sub get_id() {
 
-	my $id = $BWD_CONF{'first_id'};
+	my $id = $TRAFFD_CONF{'first_id'};
 
 	while (defined($ID{$id})) {
 		$id++;	
@@ -164,7 +164,7 @@ sub db_reload() {
 	my %db;
 
 
-	my $query = $BWD_CONF{'scan_query'};
+	my $query = $TRAFFD_CONF{'scan_query'};
 
 	if (! ($tbh = $DBH->prepare($query)) ) {
 		mylog("Can't prepare query \'%s\', %s.\n", $query, $DBI::errstr);
@@ -309,7 +309,7 @@ while (1) {
 
 	action_cmd("chk", undef);
 	db_reload();
-	sleep($BWD_CONF{'scan_time'});
+	sleep($TRAFFD_CONF{'scan_time'});
 
 }
 
