@@ -14,10 +14,10 @@ IPSET_OPTS="skbinfo counters"
 BURST=8
 
 ACTION="$1" ; shift
-ID_SRC="$1" ; shift				# returned as hex number
 ID_DST="$1" ; shift				# returned as hex number
-BW_SRC="$1" ; shift
+ID_SRC="$1" ; shift				# returned as hex number
 BW_DST="$1" ; shift
+BW_SRC="$1" ; shift
 MARK="0x${1}/0xFFFF" ; shift		# mark returned as HEX number
 ADDR="$@"
 
