@@ -1,0 +1,92 @@
+#!/usr/bin/perl -w
+use strict;
+
+use Getopt::Std;
+use Data::Dumper;
+use POSIX qw(strftime);
+use DBI;
+use File::Basename;
+
+my $IPSET = "/usr/local/sbin/ipset";
+my $STATSFILE = "/var/run/ipset-stats";
+my $DEBUG = 0;
+
+
+my %OPTS;		# Options from command line
+my $DBH;
+my %COUNTERS;
+my $LAST_COUNTERS;
+
+
+sub load_counters($$) {
+	my ($set, $dir) = @_;
+
+	open F1, "$IPSET list $set|";
+
+	while (<F1>) {
+		if (/^([\d\.\:\/]+) packets (\d+) bytes (\d+)/) {
+			my ($addr, $pkts, $bytes) = ($1, $2, $3);
+			$COUNTERS{$addr}->{$dir}->{'TIME'} = time();
+			$COUNTERS{$addr}->{$dir}->{'BYTES'} = $bytes;
+			$COUNTERS{$addr}->{$dir}->{'PKTS'} = $pkts;
+		}
+	}
+	close F1;
+}
+
+sub store_stats() {
+
+	open F1, ">$STATSFILE\n";
+	print F1 Dumper(\%COUNTERS);
+	close F1;
+
+}
+
+sub load_stats() {
+
+	return if ( ! -r $STATSFILE );
+
+	open F1, "<$STATSFILE\n";
+	my $VAR1;
+	eval(join("", <F1>));
+	$LAST_COUNTERS = $VAR1;
+	close F1;
+
+}
+
+sub get_diff($$$) {
+	my ($addr, $dir, $type) = @_;
+
+	if (defined($COUNTERS{$addr}->{$dir}->{$type}) && defined($LAST_COUNTERS->{$addr}->{$dir}->{$type})) {
+		my $delta = $COUNTERS{$addr}->{$dir}->{$type} - $LAST_COUNTERS->{$addr}->{$dir}->{$type};
+		my $time = $COUNTERS{$addr}->{$dir}->{TIME} - $LAST_COUNTERS->{$addr}->{$dir}->{TIME};
+		return ($delta, $delta / $time);
+	} else {
+		return (undef, undef);
+	}
+	
+}
+
+sub print_diff() {
+
+	foreach my $addr (keys %COUNTERS) {
+
+		my ($in_delta, $in_pers) = get_diff($addr, "IN", "BYTES");
+		my ($out_delta, $out_pers) = get_diff($addr, "OUT", "BYTES");
+
+		printf "%s %.2f %.2f\n", $addr, $in_pers * 8 / 1000 / 1000, $out_pers * 8 / 1000 / 1000;
+
+	}
+
+}
+
+
+load_counters("BWD-SRC", "OUT");
+load_counters("BWD-DST", "IN");
+load_stats();
+
+print_diff();
+
+store_stats();
+
+
