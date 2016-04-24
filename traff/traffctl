@@ -8,6 +8,7 @@ use DBI;
 use File::Basename;
 
 my $METASTR	= "#\@shaper";
+my $SOURCEFILE = "./traffic.cfg";
 my $DATAFILE = "/etc/traffd/traffic.db";
 my $DEBUG = 0;
 my $MULT = 1000*1000; # baseu units (megabits)
@@ -239,13 +240,17 @@ if (defined($OPTS{"d"})) {
 	$DEBUG = $OPTS{"d"};
 }
 
+if ( ! -f $SOURCEFILE ) {
+	die "Can't find source file $SOURCEFILE\n";
+}
+
 db_connect() || die "Exiting...";
 db_init() || die "Exiting...";
 
 if (defined($OPTS{"l"})) {
 	db_dump();
 } else {
-	if (!parse_config("traffic.cfg")) {
+	if (!parse_config($SOURCEFILE)) {
 	
 		printf "Configuration not updated!\n";
 	}

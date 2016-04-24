@@ -116,12 +116,20 @@ sub action_cmd($$) {
 		$cmd .= rec_str($rec);
 	}
 
-	system($cmd);
-
-	if ($? == -1) {
+	if (! open CMD, "$cmd 2>&1|" ) { 
 		mylog("Can't execute command: %s", $cmd);
 		return 0;
-	} 
+	} else {
+		my $out = join("", <CMD>);
+
+		$out =~ s/[^[:print:]]+//g;
+		$out =~ s/\n//g;
+		$out =~ s/\[\?1034h//g;
+
+		if ( defined($out) && $out ) {
+			mylog("CMD output: '%s' cmd: %s", $out, $cmd);
+		}
+	}
 
 	return 1;
 }
@@ -207,7 +215,7 @@ sub db_reload() {
 				$db{$_}->{DOWNLOAD_ID} = $RULEDB{$_}->{DOWNLOAD_ID};
 				$db{$_}->{UPLOAD_ID} = $RULEDB{$_}->{UPLOAD_ID};
 
-				mylog("Modified record: %s", rec_str( \%{$RULEDB{$_}} ));
+				mylog("Modified record: %s", rec_str( \%{$db{$_}} ));
 				action_cmd("upd", \%{$db{$_}});
 
 				($RULEDB{$_}) = ($db{$_});

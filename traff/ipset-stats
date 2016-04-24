@@ -57,7 +57,7 @@ sub load_stats() {
 sub get_diff($$$) {
 	my ($addr, $dir, $type) = @_;
 
-	if (defined($COUNTERS{$addr}->{$dir}->{$type}) && defined($LAST_COUNTERS->{$addr}->{$dir}->{$type})) {
+	if (defined($COUNTERS{$addr}->{$dir}->{TIME}) && defined($LAST_COUNTERS->{$addr}->{$dir}->{TIME})) {
 		my $delta = $COUNTERS{$addr}->{$dir}->{$type} - $LAST_COUNTERS->{$addr}->{$dir}->{$type};
 		my $time = $COUNTERS{$addr}->{$dir}->{TIME} - $LAST_COUNTERS->{$addr}->{$dir}->{TIME};
 		return ($delta, $delta / $time);
@@ -74,15 +74,17 @@ sub print_diff() {
 		my ($in_delta, $in_pers) = get_diff($addr, "IN", "BYTES");
 		my ($out_delta, $out_pers) = get_diff($addr, "OUT", "BYTES");
 
-		printf "%s %.2f %.2f\n", $addr, $in_pers * 8 / 1000 / 1000, $out_pers * 8 / 1000 / 1000;
+		if (defined($in_pers) && defined($out_pers)) {
+			printf "%s %.2f %.2f\n", $addr, $in_pers * 8 / 1000 / 1000, $out_pers * 8 / 1000 / 1000;
+		}
 
 	}
 
 }
 
 
-load_counters("BWD-SRC", "OUT");
-load_counters("BWD-DST", "IN");
+load_counters("TRAFFD-SRC", "OUT");
+load_counters("TRAFFD-DST", "IN");
 load_stats();
 
 print_diff();
