@@ -12,23 +12,30 @@ my $STATSFILE = "/var/run/ipset-stats";
 my $DEBUG = 0;
 
 
-my %OPTS;		# Options from command line
+my %OPTS = ('b' => 1, 'i' => 2, 'n' => 20, 'm' => 0);		# Options from command line
 my $DBH;
-my %COUNTERS;
-my $LAST_COUNTERS;
+my %C;
+my $LC;
 
 
-sub load_counters($$) {
-	my ($set, $dir) = @_;
 
-	open F1, "$IPSET list $set|";
+
+sub load_counters() {
+
+	open F1, "$IPSET list |";
+
+	my $setname = undef;
 
 	while (<F1>) {
-		if (/^([\d\.\:\/]+) packets (\d+) bytes (\d+)/) {
+		if (/^Name: (.+)$/) {
+			$setname = $1;
+		}
+		if (/^([\d\.\:\/]+) packets (\d+) bytes (\d+)/ && defined($setname)) {
 			my ($addr, $pkts, $bytes) = ($1, $2, $3);
-			$COUNTERS{$addr}->{$dir}->{'TIME'} = time();
-			$COUNTERS{$addr}->{$dir}->{'BYTES'} = $bytes;
-			$COUNTERS{$addr}->{$dir}->{'PKTS'} = $pkts;
+			my $key = "$setname $addr";
+			$C{$key}->{TIME} = time();
+			$C{$key}->{BYTES} = $bytes;
+			$C{$key}->{PKTS} = $pkts;
 		}
 	}
 	close F1;
@@ -37,7 +44,7 @@ sub load_counters($$) {
 sub store_stats() {
 
 	open F1, ">$STATSFILE\n";
-	print F1 Dumper(\%COUNTERS);
+	print F1 Dumper(\%C);
 	close F1;
 
 }
@@ -49,17 +56,17 @@ sub load_stats() {
 	open F1, "<$STATSFILE\n";
 	my $VAR1;
 	eval(join("", <F1>));
-	$LAST_COUNTERS = $VAR1;
+	$LC = $VAR1;
 	close F1;
 
 }
 
-sub get_diff($$$) {
-	my ($addr, $dir, $type) = @_;
+sub get_diff($$) {
+	my ($key, $type) = @_;
 
-	if (defined($COUNTERS{$addr}->{$dir}->{TIME}) && defined($LAST_COUNTERS->{$addr}->{$dir}->{TIME})) {
-		my $delta = $COUNTERS{$addr}->{$dir}->{$type} - $LAST_COUNTERS->{$addr}->{$dir}->{$type};
-		my $time = $COUNTERS{$addr}->{$dir}->{TIME} - $LAST_COUNTERS->{$addr}->{$dir}->{TIME};
+	if (defined($C{$key}->{TIME}) && defined($LC->{$key}->{TIME})) {
+		my $delta = $C{$key}->{$type} - $LC->{$key}->{$type};
+		my $time = $C{$key}->{TIME} - $LC->{$key}->{TIME};
 		return ($delta, $delta / $time);
 	} else {
 		return (undef, undef);
@@ -67,28 +74,115 @@ sub get_diff($$$) {
 	
 }
 
-sub print_diff() {
+sub sort_func {
 
-	foreach my $addr (keys %COUNTERS) {
+	if ($OPTS{'p'}) {
+		$C{$b}->{PKTS} <=> $C{$a}->{PKTS};
+	} else {
+		$C{$b}->{BYTES} <=> $C{$a}->{BYTES};
+	}
+}
 
-		my ($in_delta, $in_pers) = get_diff($addr, "IN", "BYTES");
-		my ($out_delta, $out_pers) = get_diff($addr, "OUT", "BYTES");
+sub hval($) {
+	my ($val) = @_;
 
-		if (defined($in_pers) && defined($out_pers)) {
-			printf "%s %.2f %.2f\n", $addr, $in_pers * 8 / 1000 / 1000, $out_pers * 8 / 1000 / 1000;
-		}
+	if (!defined($val)) {
+		return  sprintf "--";
+	} elsif ($val > 1500 * 1500) {
+		return  sprintf "%4.1fM", $val / 1000 / 1000;
+	} elsif ($val > 1500) {
+		return  sprintf "%4.1fk", $val / 1000;
+	} else {
+		return  sprintf "%4.1fk", $val;
+	}
+}
+
+sub init_output() {
+	
+	if ($OPTS{'m'}) { 
+	} else {
+		printf "+-------------------------------------+-------------------+-------------------+\n"; 
+		printf "|%-12s  %-22s | %8s %8s | %8s %8s |\n", "SET", "IP", "b/s" , "B", "p/s", "p";
+		printf "+-------------------------------------+-------------------+-------------------+\n"; 
+	}
+}
+
+sub finish_output() {
+	
+	if ($OPTS{'m'}) { 
+	} else {
+		printf "+-------------------------------------+-------------------+-------------------+\n"; 
+	}
+}
+sub format_output($$$$$) {
+	my ($key, $Bps, $B, $pps, $p) = @_;
+	
+	if ($OPTS{'m'}) { 
+		printf "%10s %.2f %d %.2f %d\n", $key , $Bps * 8, $B, $pps, $p;
+
+	} else {
+		my ($set, $ip) = split(/ /, $key);
+		printf "|%-12s  %-22s | %8s %8s | %8s %8s |\n", $set, $ip, hval($Bps * 8) , hval($B), hval($pps), hval($p);
 
 	}
-
 }
 
 
-load_counters("TRAFFD-SRC", "OUT");
-load_counters("TRAFFD-DST", "IN");
-load_stats();
+sub print_diff() {
 
-print_diff();
+	my $cnt = 0;
+	foreach my $key (sort sort_func keys %C) {
 
-store_stats();
+		my ($B, $Bps) = get_diff($key, 'BYTES');
+		my ($p, $pps) = get_diff($key, 'PKTS');
+
+		if (defined($Bps) && defined($B) && defined($pps) && defined($p)) {
+			format_output($key, $Bps, $B, $pps, $p);
+		}
+
+		last if ($OPTS{'n'} > 0 && $cnt++ > $OPTS{'n'});
+	}
+}
+
+if ( !getopts('bpi:n:m', \%OPTS) ) {
+
+	printf "Options:\n";
+	printf " -b : sort by bytes (default)\n";
+	printf " -p : sort by packets\n";
+	printf " -i : interval (default 2s)\n";
+	printf " -n : number of top records to print (default 20)\n";
+	printf " -m : machine output\n";
+	exit(1);
+}
+
+for (;;) { 
+
+	load_counters();
+
+	if ($OPTS{'i'} == 0) {
+		load_stats();
+	} else {
+		system("tput clear");
+	}
+
+	init_output();
+	print_diff();
+
+	finish_output();
+
+	if ($OPTS{'i'} == 0) {
+		store_stats();
+	} else {
+		my $x =  Dumper(\%C);
+		my $VAR1;
+		eval(join("", $x));
+		$LC = $VAR1;
+	}
+	
+	
+
+	last if ($OPTS{'i'} == 0);
+	sleep($OPTS{'i'});
+}
 
 
