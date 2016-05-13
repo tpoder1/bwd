@@ -17,7 +17,7 @@ my $DBH;		# database handler
 my %RULEDB;		# rule database
 our %TRAFFD_CONF;	# content of configuration file 
 my %ID;			# allocated IDs
-my %OPTS;		# options
+my %OPTS = ( 'p' => '/var/run/traffd.pid' ); # options
 my $TERMNATE = 0;
 
 
@@ -159,8 +159,14 @@ sub free_id($) {
 sub rec_str($) {
 	my ($rec) = @_;
 
-	return sprintf("%x %x %d %d %x %s", $rec->{DOWNLOAD_ID}, $rec->{UPLOAD_ID}, 
-									$rec->{DOWNLOAD}, $rec->{UPLOAD}, 
+	my $d = $rec->{DOWNLOAD};
+	my $u = $rec->{UPLOAD};
+
+	$d = $TRAFFD_CONF{'default_bw'} if (!defined($d) || $d == 0);
+	$u = $TRAFFD_CONF{'default_bw'}  if (!defined($u) || $u == 0);
+
+
+	return sprintf("%x %x %d %d %x %s", $rec->{DOWNLOAD_ID}, $rec->{UPLOAD_ID}, $d, $u, 
 									$rec->{MARK}, join(" ", @{$rec->{IP}}));
 	
 }
@@ -174,13 +180,13 @@ sub db_reload() {
 
 	my $query = $TRAFFD_CONF{'scan_query'};
 
-	if (! ($tbh = $DBH->prepare($query)) ) {
+	if (!defined($DBH) || !($tbh = $DBH->prepare($query)) ) {
 		mylog("Can't prepare query \'%s\', %s.\n", $query, $DBI::errstr);
 		return 0;
 
 	}
 
-	if (!$tbh->execute()) {
+	if (!defined($tbh) || !$tbh->execute()) {
 		mylog("Can't execute query \'%s\', %s.\n", $query, $DBI::errstr);
 		return 0;
 	}
@@ -248,6 +254,9 @@ sub daemonize() {
 	open STDIN , '<', '/dev/null';
 	open STDOUT, '>', '/dev/null';
 	open STDERR, '>', '/dev/null';
+	open PID, "> ".$OPTS{'p'};
+	printf PID "%d\n", $$;
+	close PID;
 }
 
 sub terminate() {
@@ -255,6 +264,7 @@ sub terminate() {
 	mylog("Terminating proccess and cleaning up");
 	action_cmd("fin", undef);
 	mylog("Tterminated");
+	unlink($OPTS{'p'});
 	exit(0);
 }
 
@@ -267,12 +277,13 @@ sub usage() {
 	printf " -d <debug_level> : default 0 \n";
 	printf " -c <config_file> : default /etc/bwd/bwd.conf \n";
 	printf " -F do not run process to backgroud \n";
+	printf " -p pidfile (default /var/run/traffd.pid) \n";
 	exit 1;
 }
 
 
 
-if (!getopts("d:c:F?", \%OPTS) || defined($OPTS{"?"})) {
+if (!getopts("d:c:F?p:", \%OPTS) || defined($OPTS{"?"})) {
     usage();
     exit 1;
 }
