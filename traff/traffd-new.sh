@@ -13,7 +13,8 @@ IPSET="/usr/local/sbin/ipset"
 IPSET_TYPE="hash:net"
 IPSET_OPTS="hashsize 16000 skbinfo counters"
 BURST=10
-QUANTUM=55140
+HTB_OPTS="quantum 55140"
+HFSC_OPTS="ls rate 256Kbit"
 
 if [ -f /etc/traffd/traffd-local ]; then
 	. /etc/traffd/traffd-local 
@@ -56,10 +57,10 @@ del_addrs() {
 case "$ACTION" in
 	"ini") 
 		$TC qdisc del dev $DEV root
-		$TC qdisc add dev $DEV root handle 1:0 htb
-		#$TC qdisc add dev $DEV root handle 1:0 hfsc default 1
+		#$TC qdisc add dev $DEV root handle 1:0 htb
+		$TC qdisc add dev $DEV root handle 1:0 hfsc default 1
 		## hfsc drops unclasiffied traffic, the default class must be defined
-		#$TC class add dev $DEV parent 1:0 classid 1:1 hfsc ls rate 5000000Kbit ul rate 5000000kbit
+		$TC class add dev $DEV parent 1:0 classid 1:1 hfsc ul rate 5000000kbit $HFSC_OPTS
 
 		$IPSET create TRAFFD-SRC $IPSET_TYPE $IPSET_OPTS
 		$IPSET create TRAFFD-DST $IPSET_TYPE $IPSET_OPTS
@@ -96,19 +97,19 @@ case "$ACTION" in
 		
 	"add") 
 		add_addrs $ADDR 
-		#$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ls rate 500Kbit ul rate $BW_SRC 
-		#$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ls rate 500Kbit ul rate $BW_DST 
-		$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC cburst $(($BW_SRC * $BURST))b quantum $QUANTUM
-		$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST cburst $(($BW_DST * $BURST))b quantum $QUANTUM
-		$TC qdisc add dev $DEV parent 1:${ID_SRC} sfq perturb 10
-		$TC qdisc add dev $DEV parent 1:${ID_DST} sfq perturb 10 
+		$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
+		$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
+		#$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC cburst $(($BW_SRC * $BURST))b $HTB_OPTS
+		#$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST cburst $(($BW_DST * $BURST))b $HTB_OPTS
+		$TC qdisc add dev $DEV parent 1:${ID_SRC} sfq perturb 60
+		$TC qdisc add dev $DEV parent 1:${ID_DST} sfq perturb 60 
 		;;
 
 	"upd") 
-		#$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ls rate $BW_SRC ul rate $BW_SRC 
-		#$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ls rate $BW_DST ul rate $BW_DST 
-		$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC burst $(($BW_SRC * $BURST)) quantum $QUANTUM
-		$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST burst $(($BW_DST * $BURST)) quantum $QUANTUM
+		$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
+		$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
+		#$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC burst $(($BW_SRC * $BURST)) $HTB_OPTS
+		#$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST burst $(($BW_DST * $BURST)) $HTB_OPTS
 		;;
 
 	"del") 
