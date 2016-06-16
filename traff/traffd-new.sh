@@ -15,7 +15,7 @@ IPSET_TYPE="hash:net"
 IPSET_OPTS="hashsize 16000 skbinfo counters"
 BURST=10
 HTB_OPTS="quantum 55140"
-HFSC_OPTS="ls rate 256Kbit"
+HFSC_OPTS="ls rate 1Mbit"
 
 if [ -f /etc/traffd/traffd-local ]; then
 	. /etc/traffd/traffd-local 
@@ -24,6 +24,8 @@ fi
 ACTION="$1" ; shift
 ID_DST="$1" ; shift				# returned as hex number
 ID_SRC="$1" ; shift				# returned as hex number
+PARENT_ID_DST="$1" ; shift		# returned as hex number
+PARENT_ID_SRC="$1" ; shift		# returned as hex number
 BW_DST="$1" ; shift
 BW_SRC="$1" ; shift
 MARK="0x${1}/0xFFFF" ; shift		# mark returned as HEX number
@@ -113,8 +115,8 @@ case "$ACTION" in
 		
 	"add") 
 		add_addrs $ADDR 
-		$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
-		$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
+		$TC class add dev $DEV parent 1:${PARENT_ID_SRC} classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
+		$TC class add dev $DEV parent 1:${PARENT_ID_DST} classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
 		#$TC class add dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC cburst $(($BW_SRC * $BURST))b $HTB_OPTS
 		#$TC class add dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST cburst $(($BW_DST * $BURST))b $HTB_OPTS
 		$TC qdisc add dev $DEV parent 1:${ID_SRC} sfq perturb 60
@@ -122,8 +124,8 @@ case "$ACTION" in
 		;;
 
 	"upd") 
-		$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
-		$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
+		$TC class change dev $DEV parent 1:${PARENT_ID_SRC} classid 1:${ID_SRC} hfsc ul rate $BW_SRC $HFSC_OPTS
+		$TC class change dev $DEV parent 1:${PARENT_ID_DST} classid 1:${ID_DST} hfsc ul rate $BW_DST $HFSC_OPTS
 		#$TC class change dev $DEV parent 1:0 classid 1:${ID_SRC} htb rate $BW_SRC burst $(($BW_SRC * $BURST)) $HTB_OPTS
 		#$TC class change dev $DEV parent 1:0 classid 1:${ID_DST} htb rate $BW_DST burst $(($BW_DST * $BURST)) $HTB_OPTS
 		;;
@@ -132,8 +134,8 @@ case "$ACTION" in
 		del_addrs $ADDR 
 		$TC qdisc del dev $DEV parent 1:${ID_SRC} sfq 
 		$TC qdisc del dev $DEV parent 1:${ID_DST} sfq  
-		$TC class del dev $DEV parent 1:0 classid 1:${ID_SRC}  
-		$TC class del dev $DEV parent 1:0 classid 1:${ID_DST} 
+		$TC class del dev $DEV parent 1:${PARENT_ID_SRC} classid 1:${ID_SRC}  
+		$TC class del dev $DEV parent 1:${PARENT_ID_DST} classid 1:${ID_DST} 
 		;;
 
 	"")

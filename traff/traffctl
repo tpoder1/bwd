@@ -7,7 +7,7 @@ use POSIX qw(strftime);
 use DBI;
 use File::Basename;
 
-my $METASTR	= "#\@shaper";
+my $METASTR	= "#{0,1}\@shaper";
 my $SOURCEFILE = "./traffic.cfg";
 my $DATAFILE = "/etc/traffd/traffic.db";
 my $DEBUG = 0;
@@ -16,6 +16,7 @@ my $MULT = 1000*1000; # baseu units (megabits)
 
 my %OPTS;		# Options from command line
 my $DBH;
+my %GROUPS;
 
 
 sub db_connect() {
@@ -38,12 +39,14 @@ sub db_init {
 
 	my $sql = "
 			CREATE TABLE IF NOT EXISTS ipaddr (
-			ipaddr		CHAR(90) NOT NULL PRIMARY KEY,
+			ipaddr		CHAR(90),
 			grp 		CHAR(100),
+			parent 		CHAR(100),
 			download	int NOT NULL,
 			upload		int NOT NULL,
 			mark		int ,
-			to_delete	int NOT NULL)
+			to_delete	int NOT NULL,
+			UNIQUE(ipaddr, parent))
 			";
 
 	$DBH->do('BEGIN TRANSACTION');
@@ -61,8 +64,8 @@ sub db_init {
 	return 1;
 }
 
-sub db_rule($$$$$) {
-	my ($ip, $group, $down, $up, $mark) = @_;
+sub db_rule($$$$$$) {
+	my ($ip, $group, $down, $up, $mark, $parent) = @_;
 
 	my $rows;	
 
@@ -72,16 +75,18 @@ sub db_rule($$$$$) {
 #	}
 #	
 
-	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, mark, to_delete) 
-				VALUES (?, ?, ?, ?, ?, 0)";
+	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, mark, parent, to_delete) 
+				VALUES (?, ?, ?, ?, ?, ?, 0)";
 	
-	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up, $mark)) ) {
+	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up, $mark, $parent)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
 
 	if ($rows > 0 ){
-		printf("New record %s %d %d [%d]\n", $ip, $down, $up,$mark);
+		printf("New record %s %d %d [0x%x] %s\n", 
+			defined($ip) ? $ip : "group=".$group,
+			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
 		return 1;
 	}
 
@@ -94,7 +99,9 @@ sub db_rule($$$$$) {
 	}
 
 	if ($rows > 0 ){
-		printf("Updated record %s %d %d [%d]\n", $ip, $down, $up, $mark);
+		printf("Updated record %s %d %d [0x%x] %s\n", 
+		 	defined($ip) ? $ip : "group=".$group,
+			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
 		return 1;
 	}
 
@@ -111,17 +118,21 @@ sub db_rule($$$$$) {
 
 sub db_dump() {
 
-	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload, grp, mark FROM ipaddr");
+	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload, grp, mark, parent FROM ipaddr ORDER BY ipaddr");
 
 	if (!$tbh->execute()) {	
 		printf("Can't dumb database.\n", $DBI::errstr);
 		return 0;
 	}
 
-	printf("%-25s -> %5s %5s %-18s %s\n", "IP ADDR", "UP", "DOWN", "GROUP", "MARK");
-	while (my ($ip, $up, $down, $group, $mark) = $tbh->fetchrow_array()) {
+	printf("%-25s -> %5s      %5s      %s\n", "IP ADDR", "UP", "DOWN", "OPTS");
+	while (my ($ip, $up, $down, $group, $mark, $parent) = $tbh->fetchrow_array()) {
 
-		printf("%-25s -> %5d %5d %-18s [%d]\n", $ip, $up, $down, defined($group) ? $group : $ip, $mark);
+		printf("%-25s -> %5.1f Mb/s %5.1f Mb/s mark=0x%x group=%s %s\n", 
+			defined($ip) ? $ip : "group=".$group,
+			$up / 1000 / 1000, $down / 1000 / 1000, $mark, 
+			defined($group) ? $group : $ip, 
+			defined($parent) ? "parent=".$parent : "");
 
 	}
 }
@@ -174,6 +185,7 @@ sub parse_config($) {
 			my %atts;
 			$atts{'mark'} = 0;
 			$atts{'group'} = undef;
+			$atts{'parent'} = undef;
 #			printf("Rule: %s\n", join(" : ", @arg));
 
 			for (my $x = 0; $x < @arg - 1; $x++, $x++ ) {
@@ -195,16 +207,28 @@ sub parse_config($) {
 				printf("Invalid upload/download attribute on line %d.\n", $lineno);
 				return 0;
 			}
-			if (!defined($atts{'ip'})) {
-				printf("Missing ip attribute on line %d.\n", $lineno);
+			if (defined($atts{'group'})) {
+				$GROUPS{$atts{'group'}} = 1;
+			}
+			if (defined($atts{'parent'})) {
+				if (!defined($GROUPS{$atts{'parent'}})) {
+					printf("Parent '%s' uses unexisting group on line %d.\n", $atts{'parent'}, $lineno);
+					return 0;
+				}
+			}
+			if (!defined($atts{'ip'}) && !defined($atts{'group'})) {
+				printf("Missing ip or group attribute on line %d.\n", $lineno);
 				return 0;
+			}
+			if ($atts{'mark'} =~ /0x[\d+|a-f|A-F]+$/) {
+				$atts{'mark'} = hex $atts{'mark'};
 			}
 			if ($atts{'mark'} !~ /^\d+$/) {
 				printf("Invalid mark attribute on line %d (must be number).\n", $lineno);
 				return 0;
 			}
 			
-			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'} * $MULT , $atts{'upload'} * $MULT, $atts{'mark'}); 
+			my $ret = db_rule($atts{'ip'}, $atts{'group'}, $atts{'download'} * $MULT , $atts{'upload'} * $MULT, $atts{'mark'}, $atts{'parent'}); 
 
 			if (!$ret) {
 				return 0;
