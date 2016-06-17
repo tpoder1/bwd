@@ -1,0 +1,14 @@
+[Unit]
+Description=Traffic Daemon
+After=network.target
+
+[Service]
+KillMode=none
+Type=forking
+ExecStart=/usr/local/net/bin/traffd
+ExecStop=/bin/sh -c "kill -TERM $(cat /var/run/traffd.pid)"
+ExecReload=/bin/sh -c "kill -HUP $(cat /var/run/traffd.pid)"
+PIDFile=/var/run/traffd.pid 
+
+[Install]
+WantedBy=multi-user.target

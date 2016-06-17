@@ -10,6 +10,7 @@ use File::Basename;
 my $METASTR	= "#{0,1}\@shaper";
 my $SOURCEFILE = "./traffic.cfg";
 my $DATAFILE = "/etc/traffd/traffic.db";
+my $DUMPFILE = "/var/spool/traffd";
 my $DEBUG = 0;
 my $MULT = 1000*1000; # baseu units (megabits)
 
@@ -111,12 +112,56 @@ sub db_rule($$$$$$) {
 		return 0;
 	}
 
-
 	return 1;
-	
+}
+
+# print group where parent is $parent
+sub print_grp {
+	my ($parent, $db) = @_;
+
+	foreach my $grp (sort { $a cmp $b } keys %{$db}) {
+
+		next if (defined($parent) && !defined($db->{$grp}->{PARENT}));
+		next if (!defined($parent) && defined($db->{$grp}->{PARENT}));
+		next if (defined($parent) && defined($db->{$grp}->{PARENT}) && $parent ne $db->{$grp}->{PARENT});
+
+		my $iplist = "" ;
+
+		if (defined($db->{$grp}->{IP})) {
+
+			$iplist = join(",", @{$db->{$grp}->{IP}});
+		}
+		printf "%-20s %4d %4d 0x%03x 0x%03x 0x%03x %s\n", 
+			("  " x $db->{$grp}->{DEEP}).$grp, 
+			$db->{$grp}->{DOWNLOAD} / 1000 / 1000, $db->{$grp}->{UPLOAD}/ 1000/ 1000,
+			$db->{$grp}->{DOWNLOAD_ID},
+			$db->{$grp}->{UPLOAD_ID},
+			$db->{$grp}->{MARK},
+			$iplist;
+		
+		print_grp($grp, $db);
+	}
 }
 
 sub db_dump() {
+
+	if ( ! -f $DUMPFILE ) {
+		printf "Can't open traffd dump file %s\n", $DUMPFILE;
+		exit(1);
+	}
+
+	our $VAR1 = undef;
+
+	do $DUMPFILE;
+	my $db = $VAR1;
+
+	printf "GROUP                DOWN   UP  D_ID  U_ID  MARK IP(s)\n";
+
+	print_grp(undef, $db);
+#	printf Dumper($VAR1);
+}
+
+sub db_query_dump() {
 
 	my $tbh = $DBH->prepare("SELECT ipaddr, download, upload, grp, mark, parent FROM ipaddr ORDER BY ipaddr");
 
@@ -251,11 +296,12 @@ sub usage() {
 	printf "config sync control\n";
 	printf "Usage:\n";
 	printf "    %s [ -d <debug_level> ] [ -l ] \n\n", $0;
-	printf " -l : list current database \n";
+	printf " -q : dump sql database \n";
+	printf " -l : dump internal traffd database \n";
 	exit 1;
 }
 
-if (!getopts("d:l", \%OPTS) || defined($OPTS{"?"})) {
+if (!getopts("d:lq", \%OPTS) || defined($OPTS{"?"})) {
 	usage();	
 	exit 1;
 }
@@ -271,12 +317,16 @@ if ( ! -f $SOURCEFILE ) {
 db_connect() || die "Exiting...";
 db_init() || die "Exiting...";
 
-if (defined($OPTS{"l"})) {
+if (defined($OPTS{"q"})) {
+	db_query_dump();
+} elsif (defined($OPTS{"l"})) {
 	db_dump();
 } else {
 	if (!parse_config($SOURCEFILE)) {
 	
 		printf "Configuration not updated!\n";
+	} else {
+		system('kill -HUP $(cat /var/run/traffd.pid)');
 	}
 	db_finish() || die "Exiting...";
 }

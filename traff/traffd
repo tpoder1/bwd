@@ -19,6 +19,7 @@ our %TRAFFD_CONF;	# content of configuration file
 my %ID;			# allocated IDs
 my %OPTS = ( 'p' => '/var/run/traffd.pid' ); # options
 my $TERMNATE = 0;
+my $UPDATED = 0;
 
 
 
@@ -55,6 +56,8 @@ sub db_connect() {
 			$dsn = "DBI:Pg:dbname=$db;host=$server";
 		} elsif ($driver eq "sqlite") {
 			$dsn = "dbi:SQLite:dbname=$db";
+		} else {
+			$dsn = $driver.$server.$db;
 		}
 
 		mylog("Connecting DB: %s,%s,*password*", $dsn, $user) if ($DEBUG > 0); 
@@ -406,6 +409,11 @@ $SIG{'INT'} = sub { terminate(); };
 $SIG{'QUIT'} = sub { terminate(); };;
 $SIG{'TERM'} = sub { terminate(); };;
 $SIG{'KILL'} = sub { terminate(); };;
+$SIG{'CONT'} = sub { terminate(); };;
+$SIG{'HUP'} = sub { 
+	mylog("HUP signal received - updating");
+	$UPDATED = 0; 
+};
 #$SIG{'KILL'} = &terminate;
 
 
@@ -417,8 +425,6 @@ if (!action_cmd("ini", undef)) {
 	exit(1);
 }
 
-
-
 while (1) { 
 
 	# reconenct DB if it is nescessary 
@@ -427,11 +433,15 @@ while (1) {
 	}
 
 	action_cmd("chk", undef);
-	my $updated = db_reload();
-	if (defined($updated) && $updated > 0) {
+	my $dbupdated = db_reload();
+	if (defined($dbupdated) && $dbupdated > 0) {
 		db_dump();
 	}
-	sleep($TRAFFD_CONF{'scan_time'});
+	$UPDATED = time();
+
+	while ($UPDATED + $TRAFFD_CONF{'scan_time'} > time()) {	
+		sleep(1);
+	}
 
 }
 
