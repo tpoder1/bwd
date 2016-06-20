@@ -8,7 +8,7 @@ use DBI;
 use File::Basename;
 
 my $METASTR	= "#{0,1}\@shaper";
-my $SOURCEFILE = "./traffic.cfg";
+my $SOURCEFILE = "/etc/traffd/traffic.cfg";
 my $DATAFILE = "/etc/traffd/traffic.db";
 my $DUMPFILE = "/var/spool/traffd";
 my $DEBUG = 0;
@@ -295,7 +295,7 @@ sub parse_config($) {
 sub usage() {
 	printf "config sync control\n";
 	printf "Usage:\n";
-	printf "    %s [ -d <debug_level> ] [ -l ] \n\n", $0;
+	printf "    %s [ -d <debug_level> ] [ -q ] [ -l ] \n\n", $0;
 	printf " -q : dump sql database \n";
 	printf " -l : dump internal traffd database \n";
 	exit 1;
@@ -310,10 +310,6 @@ if (defined($OPTS{"d"})) {
 	$DEBUG = $OPTS{"d"};
 }
 
-if ( ! -f $SOURCEFILE ) {
-	die "Can't find source file $SOURCEFILE\n";
-}
-
 db_connect() || die "Exiting...";
 db_init() || die "Exiting...";
 
@@ -322,6 +318,11 @@ if (defined($OPTS{"q"})) {
 } elsif (defined($OPTS{"l"})) {
 	db_dump();
 } else {
+
+	if ( ! -f $SOURCEFILE ) {
+		die "Can't find input file $SOURCEFILE\n";
+	}
+
 	if (!parse_config($SOURCEFILE)) {
 	
 		printf "Configuration not updated!\n";
