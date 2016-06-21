@@ -78,7 +78,10 @@ sub db_rule($$$$$$) {
 
 	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, mark, parent, to_delete) 
 				VALUES (?, ?, ?, ?, ?, ?, 0)";
-	
+
+	$parent = '' if (!defined($parent));
+	$ip = '' if (!defined($ip));
+
 	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up, $mark, $parent)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
@@ -91,17 +94,17 @@ sub db_rule($$$$$$) {
 		return 1;
 	}
 
-	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, mark = ?, to_delete = 0 
-			WHERE ipaddr = ? and (download != ? or upload != ? or grp != ? or mark != ?)";
+	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, mark = ?, parent = ?, to_delete = 0 
+			WHERE (ipaddr = ? and grp = ? and parent = ?) and (download != ? or upload != ? or mark != ?)";
 
-	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $mark, $ip, $down, $up, $group, $mark)) ) {
+	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $mark, $parent, $ip, $group, $parent, $down, $up, $mark)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
 
 	if ($rows > 0 ){
 		printf("Updated record %s %d %d [0x%x] %s\n", 
-		 	defined($ip) ? $ip : "group=".$group,
+		 	defined($ip) && $ip ne ''  ? $ip : "group=".$group,
 			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
 		return 1;
 	}
@@ -174,10 +177,10 @@ sub db_query_dump() {
 	while (my ($ip, $up, $down, $group, $mark, $parent) = $tbh->fetchrow_array()) {
 
 		printf("%-25s -> %5.1f Mb/s %5.1f Mb/s mark=0x%x group=%s %s\n", 
-			defined($ip) ? $ip : "group=".$group,
+			defined($ip) && $ip ne '' ? $ip : "group=".$group,
 			$up / 1000 / 1000, $down / 1000 / 1000, $mark, 
 			defined($group) ? $group : $ip, 
-			defined($parent) ? "parent=".$parent : "");
+			defined($parent) && $parent ne '' ? "parent=".$parent : "");
 
 	}
 }
@@ -229,7 +232,9 @@ sub parse_config($) {
 	
 			my %atts;
 			$atts{'mark'} = 0;
+#			$atts{'group'} = '';
 			$atts{'group'} = undef;
+			$atts{'parent'} = '';
 			$atts{'parent'} = undef;
 #			printf("Rule: %s\n", join(" : ", @arg));
 
