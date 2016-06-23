@@ -40,14 +40,14 @@ sub db_init {
 
 	my $sql = "
 			CREATE TABLE IF NOT EXISTS ipaddr (
-			ipaddr		CHAR(90),
-			grp 		CHAR(100),
-			parent 		CHAR(100),
+			ipaddr		CHAR(90) NOT NULL,
+			grp 		CHAR(100) NOT NULL,
+			parent 		CHAR(100) NOT NULL,
 			download	int NOT NULL,
 			upload		int NOT NULL,
 			mark		int ,
 			to_delete	int NOT NULL,
-			UNIQUE(ipaddr, parent))
+			UNIQUE(ipaddr, grp, parent))
 			";
 
 	$DBH->do('BEGIN TRANSACTION');
@@ -90,7 +90,7 @@ sub db_rule($$$$$$) {
 	if ($rows > 0 ){
 		printf("New record %s %d %d [0x%x] %s\n", 
 			defined($ip) ? $ip : "group=".$group,
-			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
+			$down, $up, $mark, defined($parent) && $parent ne '' ? "parent=".$parent : "");
 		return 1;
 	}
 
@@ -105,12 +105,12 @@ sub db_rule($$$$$$) {
 	if ($rows > 0 ){
 		printf("Updated record %s %d %d [0x%x] %s\n", 
 		 	defined($ip) && $ip ne ''  ? $ip : "group=".$group,
-			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
+			$down, $up, $mark, defined($parent) && $parent ne ''  ? "parent=".$parent : "");
 		return 1;
 	}
 
-	$sql = "UPDATE ipaddr SET to_delete = 0 WHERE ipaddr = ?";
-	if (! ($rows = $DBH->do($sql, undef, $ip)) ) {
+	$sql = "UPDATE ipaddr SET to_delete = 0 WHERE ipaddr = ? and grp = ? and parent = ?";
+	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $parent)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
@@ -232,8 +232,8 @@ sub parse_config($) {
 	
 			my %atts;
 			$atts{'mark'} = 0;
-#			$atts{'group'} = '';
-			$atts{'group'} = undef;
+			$atts{'group'} = '';
+#			$atts{'group'} = undef;
 			$atts{'parent'} = '';
 			$atts{'parent'} = undef;
 #			printf("Rule: %s\n", join(" : ", @arg));
