@@ -8,7 +8,7 @@ use DBI;
 use File::Basename;
 
 my $METASTR	= "#{0,1}\@shaper";
-my $SOURCEFILE = "./traffic.cfg";
+my $SOURCEFILE = "/etc/traffd/traffic.cfg";
 my $DATAFILE = "/etc/traffd/traffic.db";
 my $DUMPFILE = "/var/spool/traffd";
 my $DEBUG = 0;
@@ -40,14 +40,14 @@ sub db_init {
 
 	my $sql = "
 			CREATE TABLE IF NOT EXISTS ipaddr (
-			ipaddr		CHAR(90),
-			grp 		CHAR(100),
-			parent 		CHAR(100),
+			ipaddr		CHAR(90) NOT NULL,
+			grp 		CHAR(100) NOT NULL,
+			parent 		CHAR(100) NOT NULL,
 			download	int NOT NULL,
 			upload		int NOT NULL,
 			mark		int ,
 			to_delete	int NOT NULL,
-			UNIQUE(ipaddr, parent))
+			UNIQUE(ipaddr, grp, parent))
 			";
 
 	$DBH->do('BEGIN TRANSACTION');
@@ -78,7 +78,10 @@ sub db_rule($$$$$$) {
 
 	my $sql = "INSERT OR IGNORE INTO ipaddr (ipaddr, grp, download, upload, mark, parent, to_delete) 
 				VALUES (?, ?, ?, ?, ?, ?, 0)";
-	
+
+	$parent = '' if (!defined($parent));
+	$ip = '' if (!defined($ip));
+
 	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $down, $up, $mark, $parent)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
@@ -87,27 +90,27 @@ sub db_rule($$$$$$) {
 	if ($rows > 0 ){
 		printf("New record %s %d %d [0x%x] %s\n", 
 			defined($ip) ? $ip : "group=".$group,
-			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
+			$down, $up, $mark, defined($parent) && $parent ne '' ? "parent=".$parent : "");
 		return 1;
 	}
 
-	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, mark = ?, to_delete = 0 
-			WHERE ipaddr = ? and (download != ? or upload != ? or grp != ? or mark != ?)";
+	$sql = "UPDATE ipaddr SET download = ?, upload = ?, grp = ?, mark = ?, parent = ?, to_delete = 0 
+			WHERE (ipaddr = ? and grp = ? and parent = ?) and (download != ? or upload != ? or mark != ?)";
 
-	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $mark, $ip, $down, $up, $group, $mark)) ) {
+	if (! ($rows = $DBH->do($sql, undef, $down, $up, $group, $mark, $parent, $ip, $group, $parent, $down, $up, $mark)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
 
 	if ($rows > 0 ){
 		printf("Updated record %s %d %d [0x%x] %s\n", 
-		 	defined($ip) ? $ip : "group=".$group,
-			$down, $up, $mark, defined($parent) ? "parent=".$parent : "");
+		 	defined($ip) && $ip ne ''  ? $ip : "group=".$group,
+			$down, $up, $mark, defined($parent) && $parent ne ''  ? "parent=".$parent : "");
 		return 1;
 	}
 
-	$sql = "UPDATE ipaddr SET to_delete = 0 WHERE ipaddr = ?";
-	if (! ($rows = $DBH->do($sql, undef, $ip)) ) {
+	$sql = "UPDATE ipaddr SET to_delete = 0 WHERE ipaddr = ? and grp = ? and parent = ?";
+	if (! ($rows = $DBH->do($sql, undef, $ip, $group, $parent)) ) {
 		printf("Can't update record for %s in db.\n", $ip, $DBI::errstr);
 		return 0;
 	}
@@ -174,10 +177,10 @@ sub db_query_dump() {
 	while (my ($ip, $up, $down, $group, $mark, $parent) = $tbh->fetchrow_array()) {
 
 		printf("%-25s -> %5.1f Mb/s %5.1f Mb/s mark=0x%x group=%s %s\n", 
-			defined($ip) ? $ip : "group=".$group,
+			defined($ip) && $ip ne '' ? $ip : "group=".$group,
 			$up / 1000 / 1000, $down / 1000 / 1000, $mark, 
 			defined($group) ? $group : $ip, 
-			defined($parent) ? "parent=".$parent : "");
+			defined($parent) && $parent ne '' ? "parent=".$parent : "");
 
 	}
 }
@@ -229,7 +232,9 @@ sub parse_config($) {
 	
 			my %atts;
 			$atts{'mark'} = 0;
-			$atts{'group'} = undef;
+			$atts{'group'} = '';
+#			$atts{'group'} = undef;
+			$atts{'parent'} = '';
 			$atts{'parent'} = undef;
 #			printf("Rule: %s\n", join(" : ", @arg));
 
@@ -295,7 +300,7 @@ sub parse_config($) {
 sub usage() {
 	printf "config sync control\n";
 	printf "Usage:\n";
-	printf "    %s [ -d <debug_level> ] [ -l ] \n\n", $0;
+	printf "    %s [ -d <debug_level> ] [ -q ] [ -l ] \n\n", $0;
 	printf " -q : dump sql database \n";
 	printf " -l : dump internal traffd database \n";
 	exit 1;
@@ -310,10 +315,6 @@ if (defined($OPTS{"d"})) {
 	$DEBUG = $OPTS{"d"};
 }
 
-if ( ! -f $SOURCEFILE ) {
-	die "Can't find source file $SOURCEFILE\n";
-}
-
 db_connect() || die "Exiting...";
 db_init() || die "Exiting...";
 
@@ -322,6 +323,11 @@ if (defined($OPTS{"q"})) {
 } elsif (defined($OPTS{"l"})) {
 	db_dump();
 } else {
+
+	if ( ! -f $SOURCEFILE ) {
+		die "Can't find input file $SOURCEFILE\n";
+	}
+
 	if (!parse_config($SOURCEFILE)) {
 	
 		printf "Configuration not updated!\n";
