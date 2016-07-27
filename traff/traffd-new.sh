@@ -28,20 +28,21 @@ PARENT_ID_DST="$1" ; shift		# returned as hex number
 PARENT_ID_SRC="$1" ; shift		# returned as hex number
 BW_DST="$1" ; shift
 BW_SRC="$1" ; shift
-MARK="0x${1}/0xFFFF" ; shift		# mark returned as HEX number
+SRC_MARK="0x000${1}/0x000F" ; 			# mark returned as HEX number
+DST_MARK="0x00${1}0/0x00F0" ; shift		# mark returned as HEX number
 ADDR="$@"
 
 add_addrs() {
 	for addr in $@ ; do
 		# ipv6 
 		if [[ $addr =~ [:] ]]; then
-			$IPSET add TRAFFD-SRC6 $addr skbprio 1:${ID_SRC} skbmark ${MARK}
-			$IPSET add TRAFFD-DST6 $addr skbprio 1:${ID_DST} skbmark ${MARK}
-			$IPSET add TRAFFD-MARK6 $addr skbmark ${MARK}
+			$IPSET add TRAFFD-SRC6 $addr skbprio 1:${ID_SRC} skbmark ${SRC_MARK}
+			$IPSET add TRAFFD-DST6 $addr skbprio 1:${ID_DST} skbmark ${DST_MARK}
+			$IPSET add TRAFFD-MARK6 $addr skbmark ${SRC_MARK}
 		else 
-			$IPSET add TRAFFD-SRC $addr skbprio 1:${ID_SRC} skbmark ${MARK}
-			$IPSET add TRAFFD-DST $addr skbprio 1:${ID_DST} skbmark ${MARK}
-			$IPSET add TRAFFD-MARK $addr skbmark ${MARK}
+			$IPSET add TRAFFD-SRC $addr skbprio 1:${ID_SRC} skbmark ${SRC_MARK}
+			$IPSET add TRAFFD-DST $addr skbprio 1:${ID_DST} skbmark ${DST_MARK}
+			$IPSET add TRAFFD-MARK $addr skbmark ${SRC_MARK}
 		fi
 	done
 }
@@ -82,16 +83,16 @@ case "$ACTION" in
 		$IPTABLES  -C $CHAIN_SRC -t mangle -j SET --map-set TRAFFD-SRC src --map-prio --map-mark 2>/dev/null || \
 			$IPTABLES  -A $CHAIN_SRC -t mangle -j SET --map-set TRAFFD-SRC src --map-prio --map-mark 
 		$IPTABLES  -C $CHAIN_DST -t mangle -j SET --map-set TRAFFD-DST dst --map-prio --map-mark 2>/dev/null || \
-			$IPTABLES  -A $CHAIN_DST -t mangle -j SET --map-set TRAFFD-DST dst --map-prio  --map-mark 
-		$IPTABLES  -C $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK src,dst --map-mark 2>/dev/null || \
-			$IPTABLES  -A $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK src,dst --map-mark 
+			$IPTABLES  -A $CHAIN_DST -t mangle -j SET --map-set TRAFFD-DST dst --map-prio --map-mark 
+		$IPTABLES  -C $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK src --map-mark 2>/dev/null || \
+			$IPTABLES  -A $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK src --map-mark 
 
 		$IP6TABLES  -C $CHAIN_SRC -t mangle -j SET --map-set TRAFFD-SRC6 src --map-prio --map-mark 2>/dev/null || \
-			$IP6TABLES  -A $CHAIN_SRC -t mangle -j SET --map-set TRAFFD-SRC6 src --map-prio  --map-mark 
+			$IP6TABLES  -A $CHAIN_SRC -t mangle -j SET --map-set TRAFFD-SRC6 src --map-prio --map-mark 
 		$IP6TABLES  -C $CHAIN_DST -t mangle -j SET --map-set TRAFFD-DST6 dst --map-prio --map-mark 2>/dev/null || \
 			$IP6TABLES  -A $CHAIN_DST -t mangle -j SET --map-set TRAFFD-DST6 dst --map-prio --map-mark
-		$IP6TABLES  -C $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK6 src,dst --map-mark 2>/dev/null || \
-			$IP6TABLES  -A $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK6 src,dst --map-mark
+		$IP6TABLES  -C $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK6 src --map-mark 2>/dev/null || \
+			$IP6TABLES  -A $CHAIN_MARK -t mangle -j SET --map-set TRAFFD-MARK6 src --map-mark
 		;;
 
 	"fin") 

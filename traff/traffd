@@ -105,6 +105,7 @@ sub rec_cmp($$) {
 	# only small change in upload or download 
 	return 1 if ($r1->{DOWNLOAD} != $r2->{DOWNLOAD});
 	return 1 if ($r1->{UPLOAD} != $r2->{UPLOAD});
+	return 2 if ($r1->{MARK} != $r2->{MARK});
 	return 0;
 }
 
@@ -239,6 +240,7 @@ sub db_reload() {
 		return undef;
 	}
 
+	my $cnt = 0;
     while (my ($ip, $grp, $down, $up, $mark, $parent) = $tbh->fetchrow_array()) {
 
 		# group is not defined 
@@ -256,7 +258,16 @@ sub db_reload() {
 		if (defined($ip) && $ip ne '') {
 			push(@{$db{$grp}->{IP}}, $ip);
 		}
+		$cnt++;
     }
+
+	if (defined($TRAFFD_CONF{'min_records'})) {
+		if ($cnt < $TRAFFD_CONF{'min_records'}) {
+			mylog("Ignoring query - returned %d records, %d required\n", $cnt, $TRAFFD_CONF{'min_records'});
+			return undef;
+		}
+	}
+
 
 	# verify whether parent links to existing group and assign depth
 	my $done = 0;
