@@ -105,11 +105,7 @@ sub rec_cmp($$) {
 	# only small change in upload or download 
 	return 1 if ($r1->{DOWNLOAD} != $r2->{DOWNLOAD});
 	return 1 if ($r1->{UPLOAD} != $r2->{UPLOAD});
-<<<<<<< HEAD
 	return 2 if ($r1->{MARK} != $r2->{MARK});
-=======
-	return 1 if ($r1->{MARK} != $r2->{MARK});
->>>>>>> 669f1baabd486f7f0e15daaafff482af281905f3
 	return 0;
 }
 
