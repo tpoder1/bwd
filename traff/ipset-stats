@@ -67,10 +67,12 @@ sub get_diff($$) {
 	if (defined($C{$key}->{TIME}) && defined($LC->{$key}->{TIME})) {
 		my $delta = $C{$key}->{$type} - $LC->{$key}->{$type};
 		my $time = $C{$key}->{TIME} - $LC->{$key}->{TIME};
-		return ($delta, $delta / $time);
-	} else {
-		return (undef, undef);
-	}
+		if ($delta >= 0) {
+			return ($delta, $delta / $time);
+		}
+	} 
+
+	return (undef, undef);
 	
 }
 

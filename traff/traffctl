@@ -134,7 +134,7 @@ sub print_grp {
 
 			$iplist = join(",", @{$db->{$grp}->{IP}});
 		}
-		printf "%-20s %4d %4d 0x%03x 0x%03x 0x%03x %s\n", 
+		printf "%-25s %7.1f %7.1f 0x%03x 0x%03x 0x%03x %s\n", 
 			("  " x $db->{$grp}->{DEEP}).$grp, 
 			$db->{$grp}->{DOWNLOAD} / 1000 / 1000, $db->{$grp}->{UPLOAD}/ 1000/ 1000,
 			$db->{$grp}->{DOWNLOAD_ID},
